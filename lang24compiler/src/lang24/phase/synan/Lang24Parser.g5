@@ -1,0 +1,135 @@
+parser grammar Lang24Parser;
+
+@header {
+
+	package lang24.phase.synan;
+	
+	import java.util.*;
+	import lang24.common.report.*;
+	import lang24.data.token.*;
+	import lang24.phase.lexan.*;
+	
+	//import lang24.data.ast.*;
+	//import lang24.phase.abstr.*;
+
+}
+
+@members {
+
+	private Location loc(Token tok) { return new Location((LocLogToken)tok); }
+	private Location loc(Token     tok1, Token     tok2) { return new Location((LocLogToken)tok1, (LocLogToken)tok2); }
+	private Location loc(Token     tok1, Locatable loc2) { return new Location((LocLogToken)tok1, loc2); }
+	private Location loc(Locatable loc1, Token     tok2) { return new Location(loc1, (LocLogToken)tok2); }
+	private Location loc(Locatable loc1, Locatable loc2) { return new Location(loc1, loc2); }
+
+}
+
+options{
+    tokenVocab=Lang24Lexer;
+}
+
+
+
+
+source returns [new AstNode(new Locateable(1,1))]: def_begin EOF;
+def_begin: IDENT def_end;
+def_end: ASSIGN_OP type def_next | COL type def_next | LB params? RB COL type ( ASSIGN_OP stmt ( LCB def_begin RCB )? )? def_next;
+def_next: def_begin | ;
+
+params: POW? IDENT COL type params_next;
+params_next
+		:
+		| COM POW? IDENT COL type params_next
+		;
+
+
+
+stmt: 	expression SCOL
+ 	| expression ASSIGN_OP expression SCOL
+	| IF expression THEN stmt (ELSE stmt)?
+	| WHILE expression COL stmt
+	| RETURN expression SCOL
+	| scope_begin;
+
+scope_begin: LCB stmt scope_end;
+scope_end: stmt scope_end | RCB;
+
+type:	VOID | BOOL | CHAR | INT
+	| LSB NUMERIC RSB type
+	| POW type
+	| LB components RB
+	| LCB components RCB
+	| IDENT;
+
+components:	IDENT COL type (COM IDENT COL type)*;
+
+expression:
+	| SIZEOF LB type RB
+	| a;
+
+//left associative, hierarchical (to bi lahko popravu) (ne mi pisat write only kode)
+a: a disj b | b;
+b: b conj c | c;
+c: c rel_op d | d;
+
+d: d add_op e | e; 
+e: e mul_op f | f;
+
+f: prefix_op g | g;
+g: g postfix_op | h;
+h: voidconst | charconst | strconst | intconst | boolconst | ptrconst | LB expression RB | IDENT (LB (expression (COM expression)*)? RB)?;
+
+
+voidconst: NONE;
+boolconst: TRUE | FALSE;
+charconst: CHARACTER;
+intconst: NUMERIC;
+strconst: STRING;
+ptrconst: NIL;
+
+
+postfix_op: POW | LSB expression RSB | DOT IDENT; //postfix operator
+prefix_op: NOT | PLUS | MINUS | LT type GT; //prefix operator
+mul_op: MUL | DIV | REM;	
+add_op: PLUS | MINUS;
+rel_op: EQ | NE | LT | GT | LE | GE;
+conj: AND;
+disj: OR;
+
+
+
+/* original example
+//POZOR! ZA DOSTOP DO ELEMENTA A V LEVI REKURZIJI UPORABI _prevctx._a!!! (dejansko dostopamo do prejsnjega!!)
+
+source returns [AstExpr ast]
+	: a EOF {$ast = $a._a;};
+
+a returns [AstExpr _a]
+	: a add_op b {System.out.println("a: "+$_a+" b: "+$b._b + " prev: " + _prevctx._a); $_a = new AstBinExpr(loc($add_op._add_op), $add_op._op, _prevctx._a, $b._b);}
+	//}//new AstBinExpr(loc($PLUS), AstBinExpr.Oper.ADD, $b._a, $b._b);}
+	| b {$_a = $b._b; System.out.println("terminal node: " + $_a + " parent: "+_localctx); };
+
+b returns [AstExpr _b]
+	: b mul_op c
+	| c
+	;
+
+c returns [AstExpr _c]
+	: NUMERIC {
+		$_c = new AstAtomExpr(
+				loc($NUMERIC),
+				AstAtomExpr.Type.INT,
+				$NUMERIC.getText()
+			);
+		
+		};
+*/
+
+/*
+source returns [AstNode ast] locals [List<AstDefn> definitions = new Vector<AstDefn>()]	
+	: def_begin[$definitions] {$ast = new AstNodes($definitions);}
+	// | expression EOF {$ast = $expression._expression;}
+	// : params {$ast = $params._params;}
+	// : stmt {$ast = $stmt._stmt;}
+	;
+*/

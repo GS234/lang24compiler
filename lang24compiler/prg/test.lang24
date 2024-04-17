@@ -1,0 +1,37 @@
+a:int
+funkcija1(b:int):int = {
+    s = "jazsemstring";
+    v = nil;
+    s1 = '\64';
+    f1();
+    #none;
+    #b+1;
+    voidFun1();
+    b = b + a + 10;
+    b = 1 + -1;
+    b = b +1;
+    i = 0;
+    while (i < 10):{
+        i = i + 1;
+        b = b*-a;
+    }
+}
+{
+    i:int
+    s:^char
+    v:^void
+    s1:char
+    vo:void
+}
+main():void = {
+    c = funkcija1(10) +1;
+    voidFun1();
+}
+{
+    c: int
+}
+
+voidFun1():void = return none;
+
+f1():void = f2(); #to kr dela, neverjetno!
+f2():void = f1();

@@ -1,0 +1,5 @@
+a:int
+notwork():void={
+    a=<int> 'c' + 10;
+    notwork();
+}
