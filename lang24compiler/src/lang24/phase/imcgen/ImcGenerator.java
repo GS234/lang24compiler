@@ -389,7 +389,7 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
         Vector<ImcExpr> arguments = new Vector<>();
 
         //add static link to arguments
-        ImcExpr sl_expr = new ImcCONST(0l);
+        ImcExpr sl_expr = new ImcCONST(0l); //TODO
         arguments.add(sl_expr);
         offsets.add(0l);
         

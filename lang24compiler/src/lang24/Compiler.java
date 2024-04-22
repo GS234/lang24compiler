@@ -11,6 +11,7 @@ import lang24.phase.abstr.*;
 import lang24.phase.seman.*;
 import lang24.phase.memory.*;
 import lang24.phase.imcgen.*;
+import lang24.phase.imclin.*;
 
 /**
  * The LANG'24 compiler.
@@ -195,6 +196,19 @@ public class Compiler {
 					Abstr.tree.accept(logger, "AstDefn");
 				}
 				if (cmdLineOptValues.get("--target-phase").equals("imcgen"))
+					break;
+
+				// Linearization of intermediate code.
+				try (ImcLin imclin = new ImcLin()) {
+					Abstr.tree.accept(new ChunkGenerator(), null);
+					imclin.log();
+
+					if (true) {
+						Interpreter interpreter = new Interpreter(ImcLin.dataChunks(), ImcLin.codeChunks());
+						System.out.println("EXIT CODE: " + interpreter.run("_main"));
+					}
+				}
+				if (cmdLineOptValues.get("--target-phase").equals("imclin"))
 					break;
 
 				break;
