@@ -1,5 +1,0 @@
-a:[10][10]int
-funkcija1(b:int):int = {
-    b = a[1][1];
-    b = b + 1;
-}

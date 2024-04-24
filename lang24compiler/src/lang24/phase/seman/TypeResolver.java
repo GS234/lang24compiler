@@ -209,7 +209,7 @@ class TypeDefnAdder implements AstFullVisitor<SemType, Object>{
 
 //main thing happens here
 class TypeChecker implements AstFullVisitor<SemType, Object> {
-	private final boolean throwErrorOnError = true; //flag: za debug je fino, ce je false (treba bo se popravljat seman verjetno, verjetno tudi imcgen)
+	private final boolean throwErrorOnError = false; //flag: za debug je fino, ce je false (treba bo se popravljat seman verjetno, verjetno tudi imcgen)
 	protected AstDefn fnd(String name, Location l, SymbTable namespace) throws Report.Error{
 		try{
 			return namespace.fnd(name);
@@ -608,7 +608,7 @@ class TypeChecker implements AstFullVisitor<SemType, Object> {
 		}
 		else this.errorMessage("[!] (sfxExpr) "+sfxExpr.location()+" napaka: ni pointer");
 		SemAn.ofType.put(sfxExpr, set);
-		SemAn.isLVal.put(sfxExpr, true); //lvalue add
+		// SemAn.isLVal.put(sfxExpr, true); //lvalue add
 		return set;
 	}
 	

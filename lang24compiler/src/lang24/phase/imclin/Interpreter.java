@@ -300,8 +300,11 @@ public class Interpreter {
 				if (imcMove.src instanceof ImcCALL) {
 					call((ImcCALL) imcMove.src);
 					src = memLD(tempLD(SP));
-				} else
+					// System.out.printf("[MEM] src (if) = %s\n",src);
+				} else{
 					src = imcMove.src.accept(new ExprInterpreter(), null);
+					// System.out.printf("[MEM] src (else) = %s\n",src);
+				}
 				memST(dst, src);
 				return null;
 			}
@@ -311,8 +314,11 @@ public class Interpreter {
 				if (imcMove.src instanceof ImcCALL) {
 					call((ImcCALL) imcMove.src);
 					src = memLD(tempLD(SP));
-				} else
+					// System.out.printf("[TEMP] src (if) = %s\n",src);
+				} else{
 					src = imcMove.src.accept(new ExprInterpreter(), null);
+					// System.out.printf("[TEMP] src (else) = %s\n",src);
+				}
 				tempST(dst.temp, src);
 				return null;
 			}
@@ -408,8 +414,8 @@ public class Interpreter {
 		{
 			int pc = 0;
 			MemLabel label = null;
-
 			while (label != chunk.exitLabel) {
+				// System.out.printf("VIP %s: %s\n", stmtOffset, stmts.get(stmtOffset));
 				if (debug) {
 					pc++;
 					System.out.printf("### %s (%d):\n", chunk.frame.label.name, pc);
@@ -424,7 +430,7 @@ public class Interpreter {
 					}
 					stmtOffset = offset;
 				}
-
+				
 				label = stmts.get(stmtOffset).accept(new StmtInterpreter(), null);
 
 				stmtOffset += 1;

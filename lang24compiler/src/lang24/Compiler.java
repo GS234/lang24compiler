@@ -204,6 +204,8 @@ public class Compiler {
 					imclin.log();
 
 					if (true) {
+						System.out.println();
+						System.out.println(" ### INTERPRETER OUTPUTS + DEBUG INFO ###");
 						Interpreter interpreter = new Interpreter(ImcLin.dataChunks(), ImcLin.codeChunks());
 						System.out.println("EXIT CODE: " + interpreter.run("_main"));
 					}

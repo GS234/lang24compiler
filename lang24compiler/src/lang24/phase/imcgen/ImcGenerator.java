@@ -16,7 +16,7 @@ import lang24.phase.memory.*;
 import lang24.phase.seman.SemAn;
 
 public class ImcGenerator implements AstFullVisitor<Object, Object> {
-    private List<AstFunDefn> defnStack = new Vector<>(); //stack for 
+    private List<AstFunDefn> defnStack = new Vector<>(); //stack: v kateri funkciji se trenutno nahajamo (da ni treba preko parametrov)
     //addr: //TODO - finish/fix (might not work for all cases)
     //a2,a3,a4,a5
     //a1 - strings:
@@ -117,12 +117,30 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
                 return mem_temp;
             }
         }
-        else if(expr instanceof AstSfxExpr){
-            return this.getAddr(((AstSfxExpr)expr).expr);
+        else if(expr instanceof AstSfxExpr){ //return mem of that address
+            // System.out.println("imcgen: sfxexpr");
+            ImcExpr addr = this.getAddr(((AstSfxExpr)expr).expr);
+            ImcExpr mem = new ImcMEM(addr);
+            return mem;
         }
         return null;
     }
 
+
+    //ex6.2 //PREVERI
+    @Override
+    public Object visit(AstSfxExpr sfxExpr, Object arg){
+        sfxExpr.expr.accept(this, arg);
+        // System.out.println("abc");
+        ImcExpr e1 = ImcGen.exprImc.get(sfxExpr.expr);
+        // System.out.printf("sfx: %s\n",e1);
+        if(e1 != null){
+            //mem access:
+            ImcExpr mem = new ImcMEM(e1);
+            ImcGen.exprImc.put(sfxExpr, mem);
+        }
+        return null;
+    }
 
 
     //expr:
@@ -169,6 +187,17 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
     }
     //---------------
     
+    //sizeof:
+    @Override
+	public Object visit(AstSizeofExpr sizeofExpr, Object arg) {
+		// sizeofExpr.type.accept(this, arg);
+        SemType t = SemAn.isType.get(sizeofExpr.type);
+        Long size = MemEvaluator.type2size(t);
+        ImcExpr constExpr = new ImcCONST(size);
+        ImcGen.exprImc.put(sizeofExpr, constExpr);
+		return null;
+	}
+
     //ex1, ex2, ex3:
     @Override
 	public Object visit(AstAtomExpr atomExpr, Object arg) {
@@ -199,11 +228,9 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
             ImcGen.exprImc.put(atomExpr, new ImcCONST(c));
         }
         if(t instanceof SemIntType){
-            int n = Integer.parseInt(atomExpr.value);
+            Long n = Long.parseLong(atomExpr.value);
             ImcGen.exprImc.put(atomExpr, new ImcCONST(n));
         }
-        
-        
         return null;
 	}
 
@@ -260,20 +287,7 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
         }
         return null;
     } 
-    //ex6.2 //PREVERI
-    @Override
-    public Object visit(AstSfxExpr sfxExpr, Object arg){
-        sfxExpr.expr.accept(this, arg);
-        // System.out.println("abc");
-        ImcExpr e1 = ImcGen.exprImc.get(sfxExpr.expr);
-        // System.out.printf("sfx: %s\n",e1);
-        if(e1 != null){
-            //mem access:
-            ImcExpr mem = new ImcMEM(e1);
-            ImcGen.exprImc.put(sfxExpr, mem);
-        }
-        return null;
-    }
+    
     
     //ex8
     @Override
@@ -378,6 +392,19 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
 		return null;
 	}
     
+    //helper function for AstCallExpr visit: get static link
+    private ImcExpr getSL(AstFunDefn current, AstFunDefn calling){
+        MemFrame mf1 = Memory.frames.get(current);
+        MemFrame mf2 = Memory.frames.get(calling);
+        
+        long nMem = (mf1.depth - mf2.depth) +1; //depth difference +1 (if we call inner function, then SL is equal to FP of the caller function)
+        ImcExpr SL = new ImcTEMP(mf1.FP);
+        for(long i = 0; i < nMem; i++){
+            SL = new ImcMEM(SL);
+        }
+        return SL;
+    }
+    
     //ex10 - function call
     @Override
 	public Object visit(AstCallExpr callExpr, Object arg) {
@@ -388,8 +415,12 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
         Vector<Long> offsets = new Vector<>();
         Vector<ImcExpr> arguments = new Vector<>();
 
+        
+        //calculate static link:
+        // ImcExpr sl_expr = new ImcCONST(0l);
+        ImcExpr sl_expr = getSL(defnStack.getLast(), (AstFunDefn)fdef);
+
         //add static link to arguments
-        ImcExpr sl_expr = new ImcCONST(0l); //TODO
         arguments.add(sl_expr);
         offsets.add(0l);
         
@@ -431,7 +462,7 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
 		if (funDefn.pars != null)
 			funDefn.pars.accept(this, arg);
 		if (funDefn.stmt != null)
-			funDefn.stmt.accept(this, arg);
+            funDefn.stmt.accept(this, arg);
 		if (funDefn.defns != null)
 			funDefn.defns.accept(this, arg);
 		funDefn.type.accept(this, arg);
@@ -462,12 +493,13 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
 		assignStmt.dst.accept(this, arg);
 		assignStmt.src.accept(this, arg);
 
-        ImcExpr e_dst = ImcGen.exprImc.get(assignStmt.dst);
-        // ImcExpr e_dst = this.getAddr(assignStmt.dst); //mogoce bi bilo fino to narest tkole (ampak ne bo slo kar tako, treba je popravit relative access)
+        // ImcExpr e_dst = ImcGen.exprImc.get(assignStmt.dst);
+        ImcExpr e_dst = this.getAddr(assignStmt.dst); //mogoce bi bilo fino to narest tkole (ampak ne bo slo kar tako, treba je popravit relative access) //TODO
         ImcExpr e_src = ImcGen.exprImc.get(assignStmt.src);
         if(e_dst != null && e_src != null){
-            // ImcExpr e_mem = new ImcMEM(e_dst); //save!
-            ImcStmt s_assign = new ImcMOVE(e_dst, e_src);
+            ImcExpr e_mem = new ImcMEM(e_dst); //save!
+            ImcStmt s_assign = new ImcMOVE(e_mem, e_src);
+            // ImcStmt s_assign = new ImcMOVE(e_dst, e_src);
             ImcGen.stmtImc.put(assignStmt, s_assign);
         }
 		return null;
@@ -499,6 +531,7 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
         
         ImcStmt l1stmt = new ImcLABEL(l1);
         ImcStmt stmt1 = ImcGen.stmtImc.get(ifStmt.thenStmt);
+        //manjka jump!
         ImcStmt l2stmt = new ImcLABEL(l2);
         ImcStmt stmt2 = null;
 
@@ -512,9 +545,17 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
             stmts.add(jump);
             stmts.add(l1stmt);
             stmts.add(stmt1);
-            stmts.add(l2stmt);
-            if(stmt2 != null){
+            if(stmt2 != null){ //imamo else, treba dodati se, da ga if preskoci
+                MemLabel after = new MemLabel(); //so that if can jump over else part
+                ImcStmt lafter = new ImcLABEL(after);
+                ImcStmt jump_over_else = new ImcJUMP(after);
+                stmts.add(jump_over_else);
+                stmts.add(l2stmt);
                 stmts.add(stmt2);
+                stmts.add(lafter);
+            }
+            else{
+                stmts.add(l2stmt);
             }
             ImcStmt stmt_if = new ImcSTMTS(stmts);
             ImcGen.stmtImc.put(ifStmt, stmt_if);
@@ -587,12 +628,18 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
 		retStmt.expr.accept(this, arg);
         Vector<ImcStmt> stmts = new Vector<>(); //vector statement-ov
 		ImcExpr expr_ret = ImcGen.exprImc.get(retStmt.expr);
+        
+        if(SemAn.ofType.get(retStmt.expr) == SemVoidType.type){
+            //System.out.println("je void");
+            expr_ret = new ImcCONST(0l); //ce je void, vseeno vrni 0
+        }
         //move + jump
         if(expr_ret != null && arg != null && (arg instanceof AstFunDefn)){
             MemFrame funcFrame = Memory.frames.get((AstFunDefn)arg);
-            
-            ImcExpr expr_dist = new ImcTEMP(funcFrame.RV);
-            ImcStmt stmt_move = new ImcMOVE(expr_dist, expr_ret);
+            // ImcTEMP t = new ImcTEMP(funcFrame.RV);
+            // ImcExpr expr_dst = new ImcMEM(new ImcTEMP(funcFrame.RV));
+            ImcExpr expr_dst = new ImcTEMP(funcFrame.RV);
+            ImcStmt stmt_move = new ImcMOVE(expr_dst, expr_ret);
             MemLabel l_exit = new MemLabel();
             if(arg != null && (arg instanceof AstFunDefn)){
                 l_exit = ImcGen.exitLabel.get((AstFunDefn)arg); //dobimo exit label iz imcgen-a

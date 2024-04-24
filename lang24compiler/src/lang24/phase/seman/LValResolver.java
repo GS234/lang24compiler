@@ -64,12 +64,14 @@ public class LValResolver implements AstFullVisitor<Object, Object> {
 		arrExpr.arr.accept(this, arg);
 		arrExpr.idx.accept(this, arg);
 		Boolean b = SemAn.isLVal.get(arrExpr.arr);
+		// System.out.printf("is lval? : %s\n", b);
 		if(b != null && b){
 			SemAn.isLVal.put(arrExpr, true);
 		}
 		return null;
 	}
 
+	//TODO: is cast lvalue?
 	@Override
 	public Object visit(AstCastExpr castExpr, Object arg) {
 		castExpr.type.accept(this, arg);
@@ -81,6 +83,16 @@ public class LValResolver implements AstFullVisitor<Object, Object> {
 		return null;
 	}
 
+	//pazi! tuki se ne vemo, ce je lahko to lval, preverjanje se zgodi v TypeChecker-ju (ali je sploh pointer, ker takrat sele vemo)
+	@Override
+	public Object visit(AstSfxExpr sfxExpr, Object arg){
+		// Boolean b = SemAn.isLVal.get(sfxExpr.expr);
+		//tip se preveri v typechecker-ju
+		// if(b != null && b){
+		SemAn.isLVal.put(sfxExpr, true); //samo da ni morebitnih tezav kasneje
+		// }
+		return null;
+	}
 	
 
 }

@@ -8,8 +8,10 @@ import lang24.data.ast.tree.type.AstRecType;
 import lang24.data.ast.tree.type.AstStrType;
 import lang24.data.ast.tree.type.AstUniType;
 import lang24.data.ast.visitor.*;
+import lang24.data.lin.LinDataChunk;
 import lang24.data.mem.*;
 import lang24.data.type.*;
+import lang24.phase.imclin.ImcLin;
 import lang24.phase.seman.SemAn;
 
 /**
@@ -34,6 +36,13 @@ public class MemEvaluator implements AstFullVisitor<Object, Object> {
         input = input+pad;
         return input;
     }
+
+    // LINEARIZATION PHASE
+    private void LinAddDataChunk(MemAbsAccess a){
+        LinDataChunk dataChunk = new LinDataChunk(a);
+        ImcLin.addDataChunk(dataChunk);
+    }
+    // ------------------
 
 
     //funkcije: dodaj klicni zapis
@@ -60,7 +69,7 @@ public class MemEvaluator implements AstFullVisitor<Object, Object> {
             }
         }
 
-        //
+
         if (funDefn.defns != null){
 		    // funDefn.defns.accept(this, arg);
             MemEvaluator.localLevel++; //povecaj local level
@@ -82,12 +91,13 @@ public class MemEvaluator implements AstFullVisitor<Object, Object> {
                     defnOffset = align_n(defnOffset, alignN);
                 }
             }
-            --MemEvaluator.localLevel; //zmanjsaj
-            
+            --MemEvaluator.localLevel; //zmanjsaj            
         }
-
         
+        MemLabel ml;
+        // if it has body (code)
 		if (funDefn.stmt != null){
+            ml = (MemEvaluator.localLevel == 0)? new MemLabel(funDefn.name): new MemLabel();
             //poisci call expression-e; vzemi max od vseh
             
 
@@ -96,6 +106,9 @@ public class MemEvaluator implements AstFullVisitor<Object, Object> {
             funDefn.stmt.accept(this, size);
             // System.out.println("velikost: " +  size.getSize());
             argSize = size.getSize();
+        }
+        else{ //function has external linkage, give it global label
+            ml = new MemLabel(funDefn.name);
         }
 		
 		funDefn.type.accept(this, arg); //a rabmo it po tipu? DA!
@@ -107,7 +120,7 @@ public class MemEvaluator implements AstFullVisitor<Object, Object> {
         Long blockSize = SLSize+argSize;
         frameSize = defnOffset + ((blockSize > rTypeSize)?blockSize:rTypeSize);
         
-        MemLabel ml = (MemEvaluator.localLevel == 0)? new MemLabel(funDefn.name): new MemLabel();
+        
         MemFrame mf = new MemFrame(
             ml,
             MemEvaluator.depth,
@@ -166,6 +179,7 @@ public class MemEvaluator implements AstFullVisitor<Object, Object> {
         //global level: this is MemAbsAccess
         if(MemEvaluator.localLevel == 0){
             MemAbsAccess a = new MemAbsAccess(i, new MemLabel(varDefn.name));
+            this.LinAddDataChunk(a); //LINEARIZATION PHASE
             Memory.varAccesses.put(varDefn,a);
         }
         else{ //is relative access
@@ -267,7 +281,9 @@ public class MemEvaluator implements AstFullVisitor<Object, Object> {
             String value = atomExpr.value;
             value = value.substring(1, value.length()-1); //get value inside ""
             long len = (long) value.length() + 1l; //null terminated? if so, then +1
-            Memory.strings.put(atomExpr, new MemAbsAccess(charSize*len, new MemLabel(), atomExpr.value));
+            MemAbsAccess a = new MemAbsAccess(charSize*len, new MemLabel(), atomExpr.value);
+            this.LinAddDataChunk(a); // LINEARIZATION PHASE
+            Memory.strings.put(atomExpr, a);
         }
         return null;
 	}
@@ -283,7 +299,10 @@ public class MemEvaluator implements AstFullVisitor<Object, Object> {
         else if(type instanceof SemVoidType) return 0l;
         else if (type instanceof SemArrayType){
             SemArrayType at = (SemArrayType)type;
-            return type2size( at.elemType ) * at.size; //return size of element type multiplied by number of elements
+            long elemSize = align_n( type2size(at.elemType), alignN); //align array elements (everything is aligned now)
+
+            // return type2size( at.elemType  ) * at.size; //return size of element type multiplied by number of elements
+            return elemSize * at.size;
         }
         
         //struct:

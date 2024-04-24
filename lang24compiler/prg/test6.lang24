@@ -1,9 +1,0 @@
-crash() : void = {
-    arr[0] = arr1()^[0];
-    arr[0] = 1;
-} {
-    arr : [1] int
-    arr1() : ^[1]t
-}
-t=tt
-tt=int
