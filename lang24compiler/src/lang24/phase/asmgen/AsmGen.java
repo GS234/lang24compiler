@@ -21,7 +21,8 @@ public class AsmGen extends Phase {
 
 	public void genAsmCodes() {
 		for (LinCodeChunk codeChunk : ImcLin.codeChunks()) {
-		    Code code = /* TODO */
+		    AsmGenerator g = new AsmGenerator(codeChunk);
+			Code code = g.generateCode();
 			codes.add(code);
 		}
 	}

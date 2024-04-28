@@ -1,0 +1,22 @@
+putint(i:int):void
+a(i:bool):void = {
+    if(i) then putint(10);
+    else putint(1);
+
+    if(not not i) then putint(24);
+
+    j = 10;
+    while(j >= 0): {
+        putint(j);
+        j = j-1;
+    }
+
+    if(true) then putint(1000);
+    if(false) then putint(0);
+
+}
+{
+    j:int
+}
+
+main():void=a(true);
