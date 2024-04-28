@@ -1,0 +1,23 @@
+	LOC	Data_Segment
+G1	GREG	@
+G2	GREG
+G3	GREG
+G4	GREG
+Text	BYTE	"Hello world!",10,0
+	
+N1	BYTE 47
+N2	BYTE 69
+N3	BYTE
+
+
+	LOC	#100
+
+Main	LDB G2,N1
+	LDB G3,N2
+	
+	ADD G1,G2,G3
+	STB G1,N3
+	
+	LDA $255,N3
+	TRAP	0,Fputs,StdOut
+	TRAP	0,Halt,0
