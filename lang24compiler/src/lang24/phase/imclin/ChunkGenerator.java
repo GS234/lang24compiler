@@ -32,16 +32,18 @@ public class ChunkGenerator implements AstFullVisitor<Object, Object> {
             //this is where code lies:
 		if (funDefn.stmt != null){
             ImcStmt funStmt = ImcGen.stmtImc.get(funDefn.stmt);
-            if(funStmt instanceof ImcSTMTS){
-                funStmt.accept(new StmtExtractor(), code);
-                // for(ImcStmt s : code){ //debug
-                //     System.out.println(s);
-                // }
-            }
-            else{
-                // System.out.println(funStmt); //debug
-                code.add(funStmt);
-            }
+            funStmt.accept(new StmtExtractor(), code);
+            
+            // if(funStmt instanceof ImcSTMTS){
+            //     funStmt.accept(new StmtExtractor(), code);
+            //     // for(ImcStmt s : code){ //debug
+            //     //     System.out.println(s);
+            //     // }
+            // }
+            // else{
+            //     // System.out.println(funStmt); //debug
+            //     code.add(funStmt);
+            // }
 
             
             // we have everything to build code chunk for this function. So, build it!

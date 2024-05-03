@@ -1,22 +1,44 @@
 putint(i:int):void
+
+abs_acc:int
+
 a(i:bool):void = {
-    if(i) then putint(10);
-    else putint(1);
+    #abs_acc = 1125912791875585;
+    #abs_acc = 1125912791875585;
+    #abs_acc = 18014411394514945;
+    #abs_acc = 4629700429821902849;
+    #if(i) then putint(10);
+    #else putint(1);
 
     if(not not i) then putint(24);
+    else putint(-24);
 
-    j = 10;
-    while(j >= 0): {
-        putint(j);
-        j = j-1;
-    }
+    if(c() and c()) then putint(24);
+    else putint(-24);
 
-    if(true) then putint(1000);
-    if(false) then putint(0);
+    #j = 10;
+    #while(j >= 0): {
+    #    putint(j);
+    #    j = j-1;
+    #}
+    #abs_acc = 43928;
 
+    #if(true) then putint(1000);
+    #if(false) then putint(0);
+
+    #if(abs_acc == 10) then putint(abs_acc);
+
+
+    #return 1;
 }
 {
     j:int
 }
 
+#b(n:int, c:int):int = {
+#    return n+c;
+#}
+c():bool=return true;
+
 main():void=a(true);
+#main():void= abs_acc=b(1,2);

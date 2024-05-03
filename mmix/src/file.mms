@@ -5,19 +5,26 @@ G3	GREG
 G4	GREG
 Text	BYTE	"Hello world!",10,0
 	
+N4	OCTA 10
+N5	OCTA 10
 N1	BYTE 47
 N2	BYTE 69
-N3	BYTE
+N3	BYTE 10
+N6  BYTE
+N7	OCTA
 
 
 	LOC	#100
 
-Main	LDB G2,N1
-	LDB G3,N2
+Main	LDO G2,N4
+		LDO G3,N5
 	
-	ADD G1,G2,G3
-	STB G1,N3
+		ADD G1,G2,G3
+		STB G1,N7
+
+		ADDU G1,G1,N3
 	
-	LDA $255,N3
-	TRAP	0,Fputs,StdOut
-	TRAP	0,Halt,0
+		LDA $255,N3
+#		ADDU $255, $255,N3
+		TRAP	0,Fputs,StdOut
+		TRAP	0,Halt,0

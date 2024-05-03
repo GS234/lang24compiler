@@ -12,12 +12,5 @@ N3	BYTE
 
 	LOC	#100
 
-Main	LDB G2,N1
-	LDB G3,N2
+Main
 	
-	ADD G1,G2,G3
-	STB G1,N3
-	
-	LDA $255,N3
-	TRAP	0,Fputs,StdOut
-	TRAP	0,Halt,0
