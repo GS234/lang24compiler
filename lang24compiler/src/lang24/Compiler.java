@@ -27,8 +27,8 @@ public class Compiler {
 	}
 
 	/** All valid phases name of the compiler. */
-	private static final Vector<String> phaseNames = new Vector<String>(
-			Arrays.asList("none", "all", "lexan", "synan", "abstr", "seman", "memory", "imcgen", "imclin", "asmgen"));
+	private static final Vector<String> phaseNames = new Vector<String>(Arrays.asList("none", "all", "lexan", "synan",
+			"abstr", "seman", "memory", "imcgen", "imclin", "asmgen", "livean"));
 
 	/** Names of command line options. */
 	private static final HashSet<String> cmdLineOptNames = new HashSet<String>(
@@ -204,7 +204,7 @@ public class Compiler {
 					Abstr.tree.accept(new ChunkGenerator(), null);
 					imclin.log();
 
-					if (false) {
+					if (true) {
 						Interpreter interpreter = new Interpreter(ImcLin.dataChunks(), ImcLin.codeChunks());
 						System.out.println("EXIT CODE: " + interpreter.run("_main"));
 					}
@@ -219,6 +219,9 @@ public class Compiler {
 				}
 				if (cmdLineOptValues.get("--target-phase").equals("amsgen"))
 					break;
+
+				// Liveness analysis.
+				// By now you should know how to add another phase here ;-)
 
 				break;
 			}
