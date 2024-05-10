@@ -4,6 +4,7 @@ import java.util.*;
 
 import lang24.data.imc.code.stmt.*;
 import lang24.data.lin.*;
+import lang24.data.mem.MemLabel;
 import lang24.data.asm.*;
 import lang24.phase.*;
 import lang24.phase.imclin.*;
@@ -14,6 +15,7 @@ import lang24.phase.imclin.*;
 public class AsmGen extends Phase {
 
 	public static Vector<Code> codes = new Vector<Code>();
+	public static HashMap<MemLabel, AsmInstr> label2instr = new HashMap<>();
 
 	public AsmGen() {
 		super("asmgen");

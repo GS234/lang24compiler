@@ -19,10 +19,10 @@ N7	OCTA
 Main	LDO G2,N4
 		LDO G3,N5
 	
-		ADD G1,G2,G3
+		ADD G1,G2,G3 #add 2 numbers
 		STB G1,N7
 
-		ADDU G1,G1,N3
+#		ADDU G1,G1,N3
 	
 		LDA $255,N3
 #		ADDU $255, $255,N3

@@ -1,0 +1,19 @@
+a():int = {
+    a = 0;
+    while(a < 10): {
+        b = a+1;
+        c = c+b;
+        a = b*2;
+    }
+    return c;
+}
+{
+    a:int
+    b:int
+    c:int
+}
+
+main():void = {
+    n=a();
+}
+{n:int}

@@ -6,6 +6,7 @@ import java.nio.file.attribute.*;
 import java.util.*;
 import lang24.common.report.*;
 import lang24.phase.lexan.*;
+import lang24.phase.livean.LiveAn;
 import lang24.phase.synan.*;
 import lang24.phase.abstr.*;
 import lang24.phase.seman.*;
@@ -204,7 +205,7 @@ public class Compiler {
 					Abstr.tree.accept(new ChunkGenerator(), null);
 					imclin.log();
 
-					if (true) {
+					if (false) {
 						Interpreter interpreter = new Interpreter(ImcLin.dataChunks(), ImcLin.codeChunks());
 						System.out.println("EXIT CODE: " + interpreter.run("_main"));
 					}
@@ -221,7 +222,12 @@ public class Compiler {
 					break;
 
 				// Liveness analysis.
-				// By now you should know how to add another phase here ;-)
+				try (LiveAn livean = new LiveAn()) {
+					livean.analysis();
+					livean.log();
+				}
+				if (cmdLineOptValues.get("--target-phase").equals("livean"))
+					break;
 
 				break;
 			}
