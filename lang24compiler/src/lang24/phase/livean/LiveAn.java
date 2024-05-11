@@ -51,9 +51,7 @@ public class LiveAn extends Phase {
 				//check if in changed, set flag:
 				if(!inChanged){ //not changed yet, maybe this one has changed
 					HashSet<MemTemp> current_in = i.in(); //get new in
-					
 					inChanged = !current_in.equals(in_new);
-					// System.out.printf("in -> %s, %s, %s\n", current_in, in_new, inChanged);
 				}
 				
 				//out:
@@ -76,9 +74,7 @@ public class LiveAn extends Phase {
 				//check if changed
 				if(!outChanged){ //not changed yet, maybe this one has changed
 					HashSet<MemTemp> current_out = i.out(); //get new in
-					// if(!current_in.isEmpty())
 					outChanged = !current_out.equals(out_new); //if empty, then it is the same, so not changed (false)
-					// System.out.printf("out-> %s, %s, %s\n", current_out, out_new, outChanged);
 				}
 
 				i.addInTemps(in_new);
@@ -91,7 +87,7 @@ public class LiveAn extends Phase {
 			nIter = nIter+1;
 		}
 		while(true);
-		// System.out.println(nIter);
+		// System.out.printf("iter: [%s] %d\n",c.frame.label.name,nIter);
 	}
 	
 	public void log() {
