@@ -28,12 +28,14 @@ import lang24.data.lin.LinCodeChunk;
 import lang24.data.mem.MemLabel;
 import lang24.data.mem.MemTemp;
 import lang24.phase.imcgen.ImcGen;
+import lang24.phase.regall.RegAll;
 
 public class AsmGenerator {
     private final LinCodeChunk codeChunk;
     public AsmGenerator(LinCodeChunk codeChunk){
         this.codeChunk = codeChunk;
     }
+    
     public Code generateCode(){
         Vector<AsmInstr> instrs = new Vector<>();
         MemLabel skipToLabel = null; //used to skip all instructions to specific label (for conditional jumps: case if(false) - no need to jump)
@@ -161,7 +163,7 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         // shift, inc??, repeate if needed (greater than 65535)
         uses.add(T1); // s0 //if we need to increase, we also USE T1 (pomoje je neki tazga k >ADD T1, T1, const<, samo da je na dolocenih mestih (ML, MH, H))
         for(int n_bits = 16; n_bits < 64; n_bits += 16){
-            if(const_val > (1l<<n_bits)){
+            if(const_val >= (1l<<n_bits)){
                 long constInc = const_val >>> n_bits; //shift
                 constInc = constInc % (1l << 16); //constant to add, if 0, skip:
                 if(constInc == 0) continue;
@@ -177,6 +179,7 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
                 visArg.add(incML);
             }
         }
+        
         
         return T1;
         // return null;
@@ -304,21 +307,35 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         Vector<MemTemp> uses = new Vector<>();
         Vector<MemTemp> defs = new Vector<>();
         
-        MemTemp T1 = move.dst.accept(this, visArg); //imamo lokacijo, shrani t2 na lokacijo, kamor kaze t1 //dest
-        MemTemp T2 = move.src.accept(this, visArg); //source
+        // MemTemp T1 = move.dst.accept(this, visArg); //imamo lokacijo, shrani t2 na lokacijo, kamor kaze t1 //dest
+        // MemTemp T2 = move.src.accept(this, visArg); //source
         // System.out.printf("%s, %s, src: %s\n", T1, T2, move.src);
-        defs.add(T1); // d0
-        uses.add(T2); // s0
+        // defs.add(T1); // d0
+        // uses.add(T2); // s0
         
         AsmInstr move_asm;
         if(move.dst instanceof ImcMEM){ //store (T1 has address)
+            MemTemp T1 = ((ImcMEM)move.dst).addr.accept(this, visArg); //rabim samo address, ne dejanskega dostopa do vrednosti
+            MemTemp T2 = move.src.accept(this, visArg); //source
+            
+            // defs.add(T1); // d0 //nic ne definira!
+            uses.add(T1); // s0 //address
+            uses.add(T2); // s1
+
+
             // move_asm = new AsmOPER("STO "+T1+","+T2+",0 # move to mem", uses, defs, new Vector<>());
-            move_asm = new AsmOPER("STO `d0,`s0,0 # move to mem", uses, defs, new Vector<>());
+            move_asm = new AsmOPER("STO `s0,`s1,0 # move to mem", uses, defs, new Vector<>());
             visArg.add(move_asm);
         }
         else if(move.dst instanceof ImcTEMP){ //save register to register
             // move_asm = new AsmOPER("SET "+T1+","+T2, uses, defs, jumps); //AsmMOVE?
             // move_asm = new AsmMOVE("SET "+T1+","+T2, uses, defs); //AsmMOVE
+            // MemTemp T1 = move.dst.accept(this, visArg);
+            MemTemp T1 = ((ImcTEMP)move.dst).temp;
+            MemTemp T2 = move.src.accept(this, visArg); //source
+            
+            defs.add(T1); // d0
+            uses.add(T2); // s0
             move_asm = new AsmMOVE("SET `d0,`s0", uses, defs); //AsmMOVE
             visArg.add(move_asm);
         }
@@ -370,6 +387,7 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         defs.add(callRetVal);
         jumps.add(this.codeChunk.entryLabel);
 
+        // AsmInstr push_instr = new AsmOPER("PUSHJ $"+AsmGen.nReg+","+this.codeChunk.entryLabel.name, new Vector<>(), defs, jumps);
         AsmInstr push_instr = new AsmOPER("PUSHJ $X,"+this.codeChunk.entryLabel.name, new Vector<>(), defs, jumps);
         visArg.add(push_instr);
         return callRetVal;

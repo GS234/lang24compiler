@@ -219,7 +219,7 @@ public class RegAll extends Phase {
 
 				defs.add(T1_);
 				uses.add(T1_);
-				AsmInstr stack_offset = new AsmOPER("SUB `d0,`$254,`s0", uses, defs, null); //fp is stored in $254 //nalozi na offset + FP
+				AsmInstr stack_offset = new AsmOPER("SUB `d0,$254,`s0", uses, defs, null); //fp is stored in $254 //nalozi na offset + FP
 				AsmInstr load_relative = new AsmOPER("STO `d0,`s0,0 # end spilled store", uses, defs, null); //load from offset //FIX TODO
 				//spremeni def
 				int index = newDefs.indexOf(mt);

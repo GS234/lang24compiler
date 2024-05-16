@@ -8,17 +8,17 @@ import lang24.data.mem.MemLabel;
 import lang24.data.asm.*;
 import lang24.phase.*;
 import lang24.phase.imclin.*;
+import lang24.phase.regall.RegAll;
 
 /**
  * Machine code generator.
  */
 public class AsmGen extends Phase {
-
 	public static Vector<Code> codes = new Vector<Code>();
 	public static HashMap<MemLabel, AsmInstr> label2instr = new HashMap<>();
 
 	public AsmGen() {
-		super("asmgen");
+		super("asmgen");	
 	}
 
 	public void genAsmCodes() {

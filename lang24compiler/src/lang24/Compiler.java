@@ -237,11 +237,11 @@ public class Compiler {
 				try (RegAll regall = new RegAll()) {
 					try{
 						int nReg = Integer.parseInt(cmdLineOptValues.get("--num-regs"));
-						Report.info("regall: Using "+nReg+" registers.");
+						Report.info("[regall] Using "+nReg+" registers.");
 						regall.allocate(nReg);
 					}
 					catch (NumberFormatException e){
-						Report.warning("Incorrect number of registers specified, continuing using "+RegAll.nRegDefault+" registers.");
+						Report.warning("[regall] Incorrect number of registers specified, continuing using "+RegAll.nRegDefault+" registers.");
 						regall.allocate();
 					}
 					regall.log();
