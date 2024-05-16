@@ -22,12 +22,14 @@ public class LiveAn extends Phase {
 	public void analysis() {
 		//iter over codes:
 		for(Code c : AsmGen.codes){
-			this.analyzeCode(c);
+			// this.analyzeCode(c);
+			analyzeCode(c);
 		}
 	}
 
 	//main thing happens here (check if it works as intended)
-	public void analyzeCode(Code c){
+	//this function is also used in regall
+	public static void analyzeCode(Code c){
 		int nIter = 1;
 		do{
 			//for all n: set in, out
@@ -60,12 +62,13 @@ public class LiveAn extends Phase {
 				for(MemLabel ml : i.jumps()){ //possible successors (jump)
 					AsmInstr ai = AsmGen.label2instr.get(ml);
 					if(ai == null) continue;
-					int label_i = c.instrs.indexOf(ai)+1;
-					while(label_i != 0 && ai instanceof AsmLABEL && label_i < c.instrs.size()){ //find first instruction that is not label
-						ai = c.instrs.get(label_i);
-						label_i++;
-					}
-					if(!(ai instanceof AsmLABEL)) out_new.addAll(ai.in()); //ce ni label, lahko dobimo in
+					// int label_i = c.instrs.indexOf(ai)+1;
+					// while(label_i != 0 && ai instanceof AsmLABEL && label_i < c.instrs.size()){ //find first instruction that is not label
+					// 	ai = c.instrs.get(label_i); //ni reverse, to je ok
+					// 	label_i++;
+					// }
+					// if(!(ai instanceof AsmLABEL)) out_new.addAll(ai.in()); //ce ni label, lahko dobimo in
+					out_new.addAll(ai.in());
 				}
 				//direct neighbour (successor)
 				if(previous != null){
@@ -87,7 +90,7 @@ public class LiveAn extends Phase {
 			nIter = nIter+1;
 		}
 		while(true);
-		// System.out.printf("iter: [%s] %d\n",c.frame.label.name,nIter);
+		System.out.printf("iter: [%s] %d\n",c.frame.label.name,nIter);
 	}
 	
 	public void log() {

@@ -97,15 +97,18 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
             MemTemp T1 = ((ImcBINOP)cjump.cond).fstExpr.accept(this, visArg);
             MemTemp T2 = ((ImcBINOP)cjump.cond).sndExpr.accept(this, visArg);
             
-            defs.add(T1);
-            uses.add(T1);
-            uses.add(T2);
-            AsmInstr ai_compare = new AsmOPER("CMP "+T1+","+T1+","+T2, uses, defs, new Vector<>()); //compare it
+            defs.add(T1); //d0
+            uses.add(T1); //s0
+            uses.add(T2); //s1
+            // AsmInstr ai_compare = new AsmOPER("CMP "+T1+","+T1+","+T2, uses, defs, new Vector<>()); //compare it
+            AsmInstr ai_compare = new AsmOPER("CMP `d0,`s0,`s1", uses, defs, new Vector<>());
+            
 
             uses = new Vector<>(); //new instruction, new set
-            uses.add(T1);
+            uses.add(T1); //s0
 
-            AsmInstr ai_branch = new AsmOPER(branchAfterCompare+" "+T1+","+negLabel.name, uses, new Vector<>(), jumps);
+            // AsmInstr ai_branch = new AsmOPER(branchAfterCompare+" "+T1+","+negLabel.name, uses, new Vector<>(), jumps);
+            AsmInstr ai_branch = new AsmOPER(branchAfterCompare+" `s0,"+negLabel.name, uses, new Vector<>(), jumps);
             visArg.add(ai_compare);
             visArg.add(ai_branch);
             this.skipToLabel = cjump.posLabel; //delete unnecessary label
@@ -129,9 +132,10 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         else{
             MemTemp T1 = cjump.cond.accept(this, visArg);
             if(T1 != null){
-                uses.add(T1);
+                uses.add(T1); //s0
                 
-                AsmInstr ai_branch = new AsmOPER("BZ "+T1+","+negLabel.name, uses, new Vector<>(), jumps); //zero = false, everything else = true
+                // AsmInstr ai_branch = new AsmOPER("BZ "+T1+","+negLabel.name, uses, new Vector<>(), jumps); //zero = false, everything else = true
+                AsmInstr ai_branch = new AsmOPER("BZ `s0,"+negLabel.name, uses, new Vector<>(), jumps); //zero = false, everything else = true
                 visArg.add(ai_branch);
                 this.skipToLabel = cjump.posLabel; //delete unnecessary label
             }
@@ -148,13 +152,14 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         long constL = const_val%(1l<<16); //low 2 bytes
         MemTemp T1 = new MemTemp(); //new register to store value
         // System.out.printf("SETL [%s]\n", constL);
-        defs.add(T1);
+        defs.add(T1); //d0
 
-        AsmInstr setL = new AsmOPER("SETL "+T1+","+constL, new Vector<>(), defs, new Vector<>());
+        // AsmInstr setL = new AsmOPER("SETL "+T1+","+constL, new Vector<>(), defs, new Vector<>());
+        AsmInstr setL = new AsmOPER("SETL `d0,"+constL, new Vector<>(), defs, new Vector<>());
         visArg.add(setL);
         
         // shift, inc??, repeate if needed (greater than 65535)
-        uses.add(T1); //if we need to increase, we also USE T1 (pomoje je neki tazga k >ADD T1, T1, const<, samo da je na dolocenih mestih (ML, MH, H))
+        uses.add(T1); // s0 //if we need to increase, we also USE T1 (pomoje je neki tazga k >ADD T1, T1, const<, samo da je na dolocenih mestih (ML, MH, H))
         for(int n_bits = 16; n_bits < 64; n_bits += 16){
             if(const_val > (1l<<n_bits)){
                 long constInc = const_val >>> n_bits; //shift
@@ -167,7 +172,8 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
                     case 48: op_code = "INCH"; break;
                 }
                 
-                AsmInstr incML = new AsmOPER(op_code+" "+T1+","+constInc, uses, defs, new Vector<>());
+                // AsmInstr incML = new AsmOPER(op_code+" "+T1+","+constInc, uses, defs, new Vector<>());
+                AsmInstr incML = new AsmOPER(op_code+" `s0,"+constInc, uses, defs, new Vector<>());
                 visArg.add(incML);
             }
         }
@@ -212,30 +218,33 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
             if(((ImcBINOP)mem.addr).sndExpr instanceof ImcCONST){ //imamo relative access, drugace imamo pa array, treba je visitat sndExpr
                 Long offset = ((ImcCONST) ((ImcBINOP)mem.addr).sndExpr).value;
                 
-                defs.add(T1);
-                uses.add(base);
+                defs.add(T1); //d0
+                uses.add(base); //s0
 
-                AsmInstr load_relative = new AsmOPER("LDO "+T1+","+base+","+offset, uses, defs, new Vector<>());
+                // AsmInstr load_relative = new AsmOPER("LDO "+T1+","+base+","+offset, uses, defs, new Vector<>());
+                AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,"+offset, uses, defs, new Vector<>());
                 visArg.add(load_relative);
             }
             else{
                 MemTemp T2 = mem.addr.accept(this, visArg); //imamo drugi izraz
                 
-                defs.add(T1);
-                uses.add(base);
-                uses.add(T2);
+                defs.add(T1); //d0
+                uses.add(base); //s0
+                uses.add(T2); //s1
 
-                AsmInstr load_relative = new AsmOPER("LDO "+T1+","+base+","+T2, uses, defs, new Vector<>());
+                // AsmInstr load_relative = new AsmOPER("LDO "+T1+","+base+","+T2, uses, defs, new Vector<>());
+                AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,`s1", uses, defs, new Vector<>());
                 visArg.add(load_relative);
             }
         }
         else if(mem.addr instanceof ImcNAME){ //LDA + LDO
             MemTemp T2 = mem.addr.accept(this, visArg);
 
-            defs.add(T1);
-            uses.add(T2);
+            defs.add(T1); //d0
+            uses.add(T2); //s0
 
-            AsmInstr load_abs = new AsmOPER("LDO "+T1+","+T2+",0", uses, defs, new Vector<>());
+            // AsmInstr load_abs = new AsmOPER("LDO "+T1+","+T2+",0", uses, defs, new Vector<>());
+            AsmInstr load_abs = new AsmOPER("LDO `d0,`s0,0", uses, defs, new Vector<>());
             visArg.add(load_abs);
         }
         else{
@@ -255,11 +264,12 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         MemTemp T1 = binOp.fstExpr.accept(this, visArg);
         MemTemp T2 = binOp.sndExpr.accept(this, visArg);
         
-        defs.add(T1);
-        uses.add(T1);
-        uses.add(T2);
+        defs.add(T1); // `d0
+        uses.add(T1); // `s0
+        uses.add(T2); // `s1
         // System.out.printf("--> %s\n%s, %s (e1: %s, e2: %s)<--\n", binOp, T1, T2, binOp.fstExpr, binOp.sndExpr);
-        AsmInstr binop_asm = new AsmOPER(opCode+" "+T1+","+T1+","+T2, uses, defs, new Vector<>());
+        // AsmInstr binop_asm = new AsmOPER(opCode+" "+T1+","+T1+","+T2, uses, defs, new Vector<>());
+        AsmInstr binop_asm = new AsmOPER(opCode+" `d0,`s0,`s1", uses, defs, new Vector<>());
         visArg.add(binop_asm);
         
         //get T1, T2, store to T1, return T1
@@ -271,13 +281,15 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
 		Vector<MemTemp> uses = new Vector<>();
         Vector<MemTemp> defs = new Vector<>();
         MemTemp T1 = unOp.subExpr.accept(this, visArg);
-        uses.add(T1);
-        defs.add(T1);
+        defs.add(T1); // d0
+        uses.add(T1); // s0
         
         AsmInstr unop_instr;
         switch(unOp.oper){
-            case NOT: unop_instr = new AsmOPER("NOR "+T1+","+T1+","+T1, uses, defs, new Vector<>()); break; //one's complement
-            case NEG: unop_instr = new AsmOPER("NEGU "+T1+",0,"+T1, uses, defs, new Vector<>()); break; //two's complement
+            // case NOT: unop_instr = new AsmOPER("NOR "+T1+","+T1+","+T1, uses, defs, new Vector<>()); break; //one's complement
+            case NOT: unop_instr = new AsmOPER("NOR `d0,`s0,`s0", uses, defs, new Vector<>()); break; //one's complement
+            // case NEG: unop_instr = new AsmOPER("NEGU "+T1+",0,"+T1, uses, defs, new Vector<>()); break; //two's complement
+            case NEG: unop_instr = new AsmOPER("NEGU `d0,0,`s0", uses, defs, new Vector<>()); break; //two's complement
             default: return T1;
         }
         visArg.add(unop_instr);
@@ -295,17 +307,19 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         MemTemp T1 = move.dst.accept(this, visArg); //imamo lokacijo, shrani t2 na lokacijo, kamor kaze t1 //dest
         MemTemp T2 = move.src.accept(this, visArg); //source
         // System.out.printf("%s, %s, src: %s\n", T1, T2, move.src);
-        uses.add(T2);
-        defs.add(T1);
+        defs.add(T1); // d0
+        uses.add(T2); // s0
         
         AsmInstr move_asm;
         if(move.dst instanceof ImcMEM){ //store (T1 has address)
-            move_asm = new AsmOPER("STO "+T1+","+T2+",0 # move to mem", uses, defs, new Vector<>());
+            // move_asm = new AsmOPER("STO "+T1+","+T2+",0 # move to mem", uses, defs, new Vector<>());
+            move_asm = new AsmOPER("STO `d0,`s0,0 # move to mem", uses, defs, new Vector<>());
             visArg.add(move_asm);
         }
         else if(move.dst instanceof ImcTEMP){ //save register to register
             // move_asm = new AsmOPER("SET "+T1+","+T2, uses, defs, jumps); //AsmMOVE?
-            move_asm = new AsmMOVE("SET "+T1+","+T2, uses, defs); //AsmMOVE
+            // move_asm = new AsmMOVE("SET "+T1+","+T2, uses, defs); //AsmMOVE
+            move_asm = new AsmMOVE("SET `d0,`s0", uses, defs); //AsmMOVE
             visArg.add(move_asm);
         }
         return null; //nothing to return
@@ -318,9 +332,10 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         Vector<MemTemp> defs = new Vector<>();
         
         MemTemp T1 = new MemTemp();
-        defs.add(T1);
+        defs.add(T1); // d0
         //load address to register using LDA:
-        AsmInstr load_abs_addr = new AsmOPER("LDA "+T1+","+name.label.name, uses,defs,new Vector<>());
+        // AsmInstr load_abs_addr = new AsmOPER("LDA "+T1+","+name.label.name, uses,defs,new Vector<>());
+        AsmInstr load_abs_addr = new AsmOPER("LDA `d0,"+name.label.name, uses,defs,new Vector<>());
         visArg.add(load_abs_addr);
         return T1;
 	}

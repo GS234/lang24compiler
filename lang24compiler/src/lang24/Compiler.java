@@ -11,6 +11,7 @@ import lang24.phase.synan.*;
 import lang24.phase.abstr.*;
 import lang24.phase.seman.*;
 import lang24.phase.memory.*;
+import lang24.phase.regall.RegAll;
 import lang24.phase.imcgen.*;
 import lang24.phase.imclin.*;
 import lang24.phase.asmgen.*;
@@ -29,11 +30,11 @@ public class Compiler {
 
 	/** All valid phases name of the compiler. */
 	private static final Vector<String> phaseNames = new Vector<String>(Arrays.asList("none", "all", "lexan", "synan",
-			"abstr", "seman", "memory", "imcgen", "imclin", "asmgen", "livean"));
+			"abstr", "seman", "memory", "imcgen", "imclin", "asmgen", "livean", "regall"));
 
 	/** Names of command line options. */
 	private static final HashSet<String> cmdLineOptNames = new HashSet<String>(
-			Arrays.asList("--src-file-name", "--dst-file-name", "--target-phase", "--logged-phase", "--xml", "--xsl"));
+			Arrays.asList("--src-file-name", "--dst-file-name", "--target-phase", "--logged-phase", "--xml", "--xsl", "--num-regs"));
 
 	/** Values of command line options indexed by their command line option name. */
 	private static final HashMap<String, String> cmdLineOptValues = new HashMap<String, String>();
@@ -131,6 +132,9 @@ public class Compiler {
 				cmdLineOptValues.put("--target-phase", "all");
 			if (cmdLineOptValues.get("--logged-phase") == null)
 				cmdLineOptValues.put("--logged-phase", "none");
+			if (cmdLineOptValues.get("--num-regs") == null)
+				cmdLineOptValues.put("--num-regs", "4");
+			
 
 			// Carry out the compilation phase by phase.
 			while (true) {
@@ -229,9 +233,26 @@ public class Compiler {
 				if (cmdLineOptValues.get("--target-phase").equals("livean"))
 					break;
 
+				// Register allocation.
+				try (RegAll regall = new RegAll()) {
+					try{
+						int nReg = Integer.parseInt(cmdLineOptValues.get("--num-regs"));
+						Report.info("regall: Using "+nReg+" registers.");
+						regall.allocate(nReg);
+					}
+					catch (NumberFormatException e){
+						Report.warning("Incorrect number of registers specified, continuing using "+RegAll.nRegDefault+" registers.");
+						regall.allocate();
+					}
+					regall.log();
+				}
+				if (cmdLineOptValues.get("--target-phase").equals("regall"))
+					break;
+				
+
+
 				break;
 			}
-
 			// Let's hope we ever come this far.
 			// But beware:
 			// 1. The generated translation of the source file might be erroneous :-o
