@@ -51,6 +51,23 @@ public class RegAll extends Phase {
 						GNode gn =  ig.graph.get(mt);
 						this.tempToReg.put(mt, gn.color);
 					}
+
+					//set pushj number of registers:
+					for(int instr_i = 0; instr_i<c.instrs.size(); instr_i++){
+						AsmInstr i = c.instrs.get(instr_i);
+						if(i instanceof AsmOPER && !i.jumps().isEmpty()){
+							String s = ((AsmOPER)i).instr();
+							if(s.contains("PUSHJ")){
+								System.out.print(s+" ");
+								s = "PUSHJ $"+this.nReg+","+i.jumps().get(0).name;
+								System.out.println(s);
+								
+								AsmInstr newPushJ = new AsmOPER(s, i.uses(), i.defs(), i.jumps());
+								c.instrs.set(instr_i, newPushJ);
+							}
+						}
+					}
+
 				}
 				else{
 					System.out.print("[!] problematic temps: ");
@@ -184,7 +201,7 @@ public class RegAll extends Phase {
 
 				defs.add(T1_);
 				uses.add(T1_);
-				AsmInstr stack_offset = new AsmOPER("SUB `d0,`$254,`s0", uses, defs, null); //fp is stored in $254 //nalozi iz offset + FP
+				AsmInstr stack_offset = new AsmOPER("SUB `d0,$254,`s0", uses, defs, null); //fp is stored in $254 //nalozi iz offset + FP
 				AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,0 # end spilled load", uses, defs, null); //load from offset
 				//spremeni use
 				

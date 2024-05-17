@@ -11,6 +11,7 @@ import lang24.data.asm.Code;
 import lang24.data.imc.code.expr.ImcBINOP;
 import lang24.data.imc.code.expr.ImcCALL;
 import lang24.data.imc.code.expr.ImcCONST;
+import lang24.data.imc.code.expr.ImcExpr;
 import lang24.data.imc.code.expr.ImcMEM;
 import lang24.data.imc.code.expr.ImcNAME;
 import lang24.data.imc.code.expr.ImcSEXPR;
@@ -336,7 +337,7 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
             
             defs.add(T1); // d0
             uses.add(T2); // s0
-            move_asm = new AsmMOVE("SET `d0,`s0", uses, defs); //AsmMOVE
+            move_asm = new AsmMOVE("SET `d0,`s0 # AsmMOVE", uses, defs); //AsmMOVE
             visArg.add(move_asm);
         }
         return null; //nothing to return
@@ -369,7 +370,9 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         if(jumpLabel == this.codeChunk.exitLabel){ //it is return jump, use JUMP!
             // System.out.println("jump outta function to label: "+jump.label.name);
             // AsmInstr pop_instr = new AsmOPER("POP X, YZ", uses, defs, jumps);
-            AsmInstr jump_instr = new AsmOPER("JMP "+jump.label.name + " # return", new Vector<>(), new Vector<>(), jumps);
+            Vector<MemTemp> uses = new Vector<>();
+            uses.add(codeChunk.frame.RV);
+            AsmInstr jump_instr = new AsmOPER("JMP "+jump.label.name + " # return", uses, new Vector<>(), jumps);
             visArg.add(jump_instr);
         }
         else{ //regular jump (just jump to label)
@@ -384,17 +387,34 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         // System.out.println("klic funkcije");
         Vector<MemLabel> jumps = new Vector<>();
         Vector<MemTemp> defs = new Vector<>();
+        Vector<MemTemp> uses = new Vector<>();
         defs.add(callRetVal);
         jumps.add(this.codeChunk.entryLabel);
 
+        //kaj pa argumenti? TREBA JIH JE PASS-AT V CALL-FRAME (mogoce celo treba store-at v mem) (zaenkrat samo dodaj v uses)
+        // call.args
+        // call.offs
+        for(ImcExpr e : call.args){ //maybe TODO: store to fp+offset
+            if(e instanceof ImcTEMP){ //because we use only temps in function calls, if also allowed constants, we would need to accept args (see else)
+                uses.add(((ImcTEMP)e).temp);
+            }
+            // else{
+            //     MemTemp Ti = e.accept(this, visArg);
+            //     uses.add(Ti);
+            // }
+        }
+        //
+
         // AsmInstr push_instr = new AsmOPER("PUSHJ $"+AsmGen.nReg+","+this.codeChunk.entryLabel.name, new Vector<>(), defs, jumps);
-        AsmInstr push_instr = new AsmOPER("PUSHJ $X,"+this.codeChunk.entryLabel.name, new Vector<>(), defs, jumps);
+        AsmInstr push_instr = new AsmOPER("PUSHJ $,"+this.codeChunk.entryLabel.name, uses, defs, jumps);
         visArg.add(push_instr);
         return callRetVal;
 	}
     
     // estmt: (we ignore it, because it is only used in void function calls (return value is discarded, we do not need it))
     public MemTemp visit(ImcESTMT eStmt, Vector<AsmInstr> visArg) {
+        //remove last instr we must, because the result we need do not - master Youghurt
+        visArg.removeLast();
         return null;
     }
 }
