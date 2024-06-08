@@ -90,7 +90,7 @@ public class LiveAn extends Phase {
 			nIter = nIter+1;
 		}
 		while(true);
-		System.out.printf("iter: [%s] %d\n",c.frame.label.name,nIter);
+		// System.out.printf("iter: [%s] %d\n",c.frame.label.name,nIter);
 	}
 	
 	public void log() {

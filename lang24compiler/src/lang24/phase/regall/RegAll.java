@@ -27,12 +27,12 @@ public class RegAll extends Phase {
 		this.allocate(nRegDefault); //default value: nRegDefault
 	}
 	public void allocate(int nReg){
-		System.out.printf("RegAll alive, n. reg: %d\n", nReg);
+		// System.out.printf("RegAll alive, n. reg: %d\n", nReg);
 		this.nReg = nReg;
 		int n_iter_init = 20;
 		int n_iter = n_iter_init;
 		for(Code c : AsmGen.codes){
-			System.out.printf("-----> code segment: [%s]\n", c.frame.label.name);
+			// System.out.printf("-----> code segment: [%s]\n", c.frame.label.name);
 			boolean successful = false;
 			while(!successful){
 				this.stack.clear();
@@ -42,7 +42,7 @@ public class RegAll extends Phase {
 				successful = this.build(ig);
 				// System.out.println(ig);
 				if(successful){
-					System.out.printf("------ [%s] This chunk's temps can be successfully assigned to registers. <------\n", c.frame.label.name);
+					// System.out.printf("------ [%s] This chunk's temps can be successfully assigned to registers. <------\n", c.frame.label.name);
 					// System.out.println(ig);
 					
 
@@ -58,9 +58,9 @@ public class RegAll extends Phase {
 						if(i instanceof AsmOPER && !i.jumps().isEmpty()){
 							String s = ((AsmOPER)i).instr();
 							if(s.contains("PUSHJ")){
-								System.out.print(s+" ");
+								// System.out.print(s+" ");
 								s = "PUSHJ $"+this.nReg+","+i.jumps().get(0).name;
-								System.out.println(s);
+								// System.out.println(s);
 								
 								AsmInstr newPushJ = new AsmOPER(s, i.uses(), i.defs(), i.jumps());
 								c.instrs.set(instr_i, newPushJ);
@@ -70,7 +70,7 @@ public class RegAll extends Phase {
 
 				}
 				else{
-					System.out.print("[!] problematic temps: ");
+					// System.out.print("[!] problematic temps: ");
 					
 					//get all problematic temps (those which have potential spill (that is now actual) set to true)
 					// HashSet<MemTemp> problematic = new HashSet<>();
@@ -78,12 +78,12 @@ public class RegAll extends Phase {
 					int offset_k = 0;
 					for(GNode n : ig.graph.values()){
 						if(n.potentialSpill){
-							System.out.print(n.temp+" ");
+							// System.out.print(n.temp+" ");
 							problematic.put(n.temp, offset_k*8); //also calculate offsets; map needed: HashMap<MemTemp, Integer> (temp->offset) TODO
 							offset_k = offset_k + 1;
 						}
 					}
-					System.out.println();
+					// System.out.println();
 					
 					this.fix(c, problematic);
 
@@ -273,7 +273,7 @@ public class RegAll extends Phase {
 		c.instrs.addAll(instrs);
 
 		//naredi livean nad kodo
-		System.out.println("analying again ...");
+		// System.out.println("analying again ...");
 		LiveAn.analyzeCode(c);
 	}
 
