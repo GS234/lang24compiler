@@ -61,6 +61,83 @@ public class AsmGenerator {
         return c;
     }
 
+    // some static methods that can be used in other classes
+    public static Vector<AsmInstr> loadConstantToTemp(MemTemp mt, long c){
+        Vector<AsmInstr> instrs = new Vector<>();
+        Vector<MemTemp> uses = new Vector<>();
+        Vector<MemTemp> defs = new Vector<>();
+
+        long const_val = c; //value of constant
+        if(c < 0){ //if negative, load as if it were positive, then negate at the end
+            const_val = -const_val;
+        }
+        long constL = const_val%(1l<<16); //low 2 bytes
+        defs.add(mt); //d0
+        // AsmInstr setL = new AsmOPER("SETL "+mt+","+constL, new Vector<>(), defs, new Vector<>());
+        AsmInstr setL = new AsmOPER("SETL `d0,"+constL, new Vector<>(), defs, new Vector<>());
+        instrs.add(setL);
+        
+        // shift, inc??, repeate if needed (greater than 65535)
+        uses.add(mt); // s0 //if we need to increase, we also USE mt (pomoje je neki tazga k >ADD mt, mt, const<, samo da je na dolocenih mestih (ML, MH, H))
+        for(int n_bits = 16; n_bits < 64; n_bits += 16){
+            if(const_val >= (1l<<n_bits)){
+                long constInc = const_val >>> n_bits; //shift
+                constInc = constInc % (1l << 16); //constant to add, if 0, skip:
+                if(constInc == 0) continue;
+                String op_code = "";
+                switch(n_bits){
+                    case 16: op_code = "INCML"; break;
+                    case 32: op_code = "INCMH"; break;
+                    case 48: op_code = "INCH"; break;
+                }
+                
+                // AsmInstr incML = new AsmOPER(op_code+" "+mt+","+constInc, uses, defs, new Vector<>());
+                AsmInstr incML = new AsmOPER(op_code+" `s0,"+constInc, uses, defs, new Vector<>());
+                instrs.add(incML);
+            }
+        }
+        if(c < 0){ //we need to negate it as well (might have problems with value 0xffffffff, need to handle that as well)
+            // NEG: s($x) = Y - s($z) -> NEG $X,Y,$Z
+            AsmInstr incNEG = new AsmOPER("NEG `d0,0,`s0", uses, defs, new Vector<>());
+            instrs.add(incNEG);
+        }
+        return instrs;
+    }
+
+    // if we want to set specific register (used in outgen)
+    // this will probably also be used in regAll, outgen
+    public static Vector<AsmInstr> loadConstantToReg(String reg, long c){
+        Vector<AsmInstr> instrs = new Vector<>();
+        long const_val = c;
+        if(c < 0){
+            const_val = -const_val;
+        }
+        long constL = const_val%(1l<<16);
+        AsmInstr setL = new AsmOPER("SETL "+reg+","+constL, null, null, null);
+        instrs.add(setL);
+        
+        for(int n_bits = 16; n_bits < 64; n_bits += 16){
+            if(const_val >= (1l<<n_bits)){
+                long constInc = const_val >>> n_bits;
+                constInc = constInc % (1l << 16);
+                if(constInc == 0) continue;
+                String op_code = "";
+                switch(n_bits){
+                    case 16: op_code = "INCML"; break;
+                    case 32: op_code = "INCMH"; break;
+                    case 48: op_code = "INCH"; break;
+                }
+                AsmInstr incML = new AsmOPER(op_code+" "+reg+","+constInc, null, null, null);
+                instrs.add(incML);
+            }
+        }
+        if(c < 0){
+            AsmInstr incNEG = new AsmOPER("NEG "+reg+",0,"+reg, null, null, null);
+            instrs.add(incNEG);
+        }
+        return instrs;
+    }
+
 }
 
 class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
@@ -146,61 +223,12 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         return null;
 	}
 
-
-    public static Vector<AsmInstr> loadConstantToTemp(MemTemp mt, long c){
-        Vector<AsmInstr> instrs = null;
-        Vector<MemTemp> uses = new Vector<>();
-        Vector<MemTemp> defs = new Vector<>();
-
-        return instrs;
-    }
-
-
+    
     //ce visitam to (ImcCONST), potem nalozi konstanto v register, vrni register (temp)
 	public MemTemp visit(ImcCONST constant, Vector<AsmInstr> visArg) {
-		Vector<MemTemp> uses = new Vector<>();
-        Vector<MemTemp> defs = new Vector<>();
-        
-        long const_val = constant.value; //value of constant
-        if(constant.value < 0){ //if negative, load as if it were positive, then negate at the end
-            const_val = -const_val;
-        }
-        long constL = const_val%(1l<<16); //low 2 bytes
         MemTemp T1 = new MemTemp(); //new register to store value
-        // System.out.printf("SETL [%s]\n", constL);
-        defs.add(T1); //d0
-        // AsmInstr setL = new AsmOPER("SETL "+T1+","+constL, new Vector<>(), defs, new Vector<>());
-        AsmInstr setL = new AsmOPER("SETL `d0,"+constL, new Vector<>(), defs, new Vector<>());
-        visArg.add(setL);
-        
-        // shift, inc??, repeate if needed (greater than 65535)
-        uses.add(T1); // s0 //if we need to increase, we also USE T1 (pomoje je neki tazga k >ADD T1, T1, const<, samo da je na dolocenih mestih (ML, MH, H))
-        for(int n_bits = 16; n_bits < 64; n_bits += 16){
-            if(const_val >= (1l<<n_bits)){
-                long constInc = const_val >>> n_bits; //shift
-                constInc = constInc % (1l << 16); //constant to add, if 0, skip:
-                if(constInc == 0) continue;
-                String op_code = "";
-                switch(n_bits){
-                    case 16: op_code = "INCML"; break;
-                    case 32: op_code = "INCMH"; break;
-                    case 48: op_code = "INCH"; break;
-                }
-                
-                // AsmInstr incML = new AsmOPER(op_code+" "+T1+","+constInc, uses, defs, new Vector<>());
-                AsmInstr incML = new AsmOPER(op_code+" `s0,"+constInc, uses, defs, new Vector<>());
-                visArg.add(incML);
-            }
-        }
-        if(constant.value < 0){ //we need to negate it as well (might have problems with value 0xffffffff, need to handle that as well)
-            // NEG: s($x) = Y - s($z) -> NEG $X,Y,$Z
-            AsmInstr incML = new AsmOPER("NEG `d0,0,`s0", uses, defs, new Vector<>());
-            visArg.add(incML);
-        }
-        
-        
+        visArg.addAll(AsmGenerator.loadConstantToTemp(T1, constant.value));
         return T1;
-        // return null;
 	}
 
 	public MemTemp visit(ImcLABEL label, Vector<AsmInstr> visArg) {
@@ -239,13 +267,17 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
             if(((ImcBINOP)mem.addr).sndExpr instanceof ImcCONST){ //imamo relative access, drugace imamo pa array, treba je visitat sndExpr
                 Long offset = ((ImcCONST) ((ImcBINOP)mem.addr).sndExpr).value;
                 
+                // reuse T1: first use it to load constant and then to store actual value that is accessed from memory
+                visArg.addAll(AsmGenerator.loadConstantToTemp(T1, offset)); // offset is now in temp T1
+
+
                 defs.add(T1); //d0
                 uses.add(base); //s0
+                uses.add(T1); //s1
 
                 // AsmInstr load_relative = new AsmOPER("LDO "+T1+","+base+","+offset, uses, defs, new Vector<>());
                 // relative to what? rabmo se relativno glede na fp: TODO
-                // save offset to temp
-                AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,"+offset, uses, defs, new Vector<>());
+                AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,`s1", uses, defs, new Vector<>());
                 visArg.add(load_relative);
             }
             else{
