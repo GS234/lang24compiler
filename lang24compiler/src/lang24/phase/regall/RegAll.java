@@ -14,7 +14,7 @@ import lang24.phase.livean.LiveAn;
 public class RegAll extends Phase {
 
 	/** Mapping of temporary variables to registers. */
-	public final HashMap<MemTemp, Integer> tempToReg = new HashMap<MemTemp, Integer>();
+	public static final HashMap<MemTemp, Integer> tempToReg = new HashMap<MemTemp, Integer>();
 	public static final int nRegDefault = 4; //default value: 4
 	public int nReg;
 	
@@ -49,7 +49,7 @@ public class RegAll extends Phase {
 					//mt -> color
 					for(MemTemp mt : ig.graph.keySet()){
 						GNode gn =  ig.graph.get(mt);
-						this.tempToReg.put(mt, gn.color);
+						tempToReg.put(mt, gn.color);
 					}
 
 					//set pushj number of registers:
@@ -74,16 +74,16 @@ public class RegAll extends Phase {
 					
 					//get all problematic temps (those which have potential spill (that is now actual) set to true)
 					// HashSet<MemTemp> problematic = new HashSet<>();
-					HashMap<MemTemp, Integer> problematic = new HashMap<>();
-					int offset_k = 0;
+					HashMap<MemTemp, Long> problematic = new HashMap<>(); // mapping: temp->offset
+					int offset_k = 0; //should be global to code
 					for(GNode n : ig.graph.values()){
 						if(n.potentialSpill){
-							// System.out.print(n.temp+" ");
-							problematic.put(n.temp, offset_k*8); //also calculate offsets; map needed: HashMap<MemTemp, Integer> (temp->offset) TODO
-							offset_k = offset_k + 1;
+							problematic.put(n.temp, c.tempSize*8l); //also calculate offsets; save to map
+							System.out.print(n.temp+" "+c.tempSize*8l+", ");
+							c.tempSize = c.tempSize + 1; //increase temp size
 						}
 					}
-					// System.out.println();
+					System.out.println();
 					
 					this.fix(c, problematic);
 
@@ -174,7 +174,7 @@ public class RegAll extends Phase {
 	}
 	
 	//4. dodaj kodo, se enkrat livean, se enkrat vse ostalo
-	private void fix(Code c, HashMap<MemTemp, Integer> problematic){
+	private void fix(Code c, HashMap<MemTemp, Long> problematic){
 		// System.out.println("this is fix");
 		//spremeni ukaze (dodaj save + load)
 		Vector<AsmInstr> instrs = new Vector<>();
@@ -201,7 +201,7 @@ public class RegAll extends Phase {
 
 				defs.add(T1_);
 				uses.add(T1_);
-				AsmInstr stack_offset = new AsmOPER("SUB `d0,$254,`s0", uses, defs, null); //fp is stored in $254 //nalozi iz offset + FP
+				AsmInstr stack_offset = new AsmOPER("SUB `d0,FP,`s0", uses, defs, null); //fp is stored in $254 //nalozi iz offset + FP
 				AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,0 # end spilled load", uses, defs, null); //load from offset
 				//spremeni use
 				
@@ -236,7 +236,7 @@ public class RegAll extends Phase {
 
 				defs.add(T1_);
 				uses.add(T1_);
-				AsmInstr stack_offset = new AsmOPER("SUB `d0,$254,`s0", uses, defs, null); //fp is stored in $254 //nalozi na offset + FP
+				AsmInstr stack_offset = new AsmOPER("SUB `d0,FP,`s0", uses, defs, null); //fp is stored in $254 (FP) //nalozi na offset + FP (FP je deklariran v header-ju od file-a)
 				AsmInstr load_relative = new AsmOPER("STO `d0,`s0,0 # end spilled store", uses, defs, null); //load from offset //FIX TODO
 				//spremeni def
 				int index = newDefs.indexOf(mt);
@@ -278,7 +278,7 @@ public class RegAll extends Phase {
 	}
 
 	//ne bo vredu, treba bo popravit
-	private <T> HashSet<T> intersection(Vector<T> current, HashMap<T, Integer> other){
+	private <T> HashSet<T> intersection(Vector<T> current, HashMap<T, Long> other){
 		HashSet<T> vrni = new HashSet<>();
 		for(T el : other.keySet()){
 			if(current.contains(el)) vrni.add(el);

@@ -15,6 +15,7 @@ import lang24.phase.regall.RegAll;
 import lang24.phase.imcgen.*;
 import lang24.phase.imclin.*;
 import lang24.phase.asmgen.*;
+import lang24.phase.outgen.*;
 
 /**
  * The LANG'24 compiler.
@@ -30,7 +31,7 @@ public class Compiler {
 
 	/** All valid phases name of the compiler. */
 	private static final Vector<String> phaseNames = new Vector<String>(Arrays.asList("none", "all", "lexan", "synan",
-			"abstr", "seman", "memory", "imcgen", "imclin", "asmgen", "livean", "regall"));
+			"abstr", "seman", "memory", "imcgen", "imclin", "asmgen", "livean", "regall", "outgen"));
 
 	/** Names of command line options. */
 	private static final HashSet<String> cmdLineOptNames = new HashSet<String>(
@@ -222,7 +223,7 @@ public class Compiler {
 					asmgen.genAsmCodes();
 					asmgen.log();
 				}
-				if (cmdLineOptValues.get("--target-phase").equals("amsgen"))
+				if (cmdLineOptValues.get("--target-phase").equals("asmgen"))
 					break;
 
 				// Liveness analysis.
@@ -248,9 +249,16 @@ public class Compiler {
 				}
 				if (cmdLineOptValues.get("--target-phase").equals("regall"))
 					break;
+
+				// final phase: putting it all together (output generation phase)
+				try (OutGen outgen = new OutGen()) {
+					int nReg = Integer.parseInt(cmdLineOptValues.get("--num-regs"));
+					Report.info("[outgen] Using "+nReg+" registers.");
+					outgen.setNreg(nReg); // set number of registers to use
+					outgen.generateOutput();
+					outgen.log();
+				}
 				
-
-
 				break;
 			}
 			// Let's hope we ever come this far.

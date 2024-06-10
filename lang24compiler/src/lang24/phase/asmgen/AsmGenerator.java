@@ -146,17 +146,29 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         return null;
 	}
 
+
+    public static Vector<AsmInstr> loadConstantToTemp(MemTemp mt, long c){
+        Vector<AsmInstr> instrs = null;
+        Vector<MemTemp> uses = new Vector<>();
+        Vector<MemTemp> defs = new Vector<>();
+
+        return instrs;
+    }
+
+
     //ce visitam to (ImcCONST), potem nalozi konstanto v register, vrni register (temp)
 	public MemTemp visit(ImcCONST constant, Vector<AsmInstr> visArg) {
 		Vector<MemTemp> uses = new Vector<>();
         Vector<MemTemp> defs = new Vector<>();
         
         long const_val = constant.value; //value of constant
+        if(constant.value < 0){ //if negative, load as if it were positive, then negate at the end
+            const_val = -const_val;
+        }
         long constL = const_val%(1l<<16); //low 2 bytes
         MemTemp T1 = new MemTemp(); //new register to store value
         // System.out.printf("SETL [%s]\n", constL);
         defs.add(T1); //d0
-
         // AsmInstr setL = new AsmOPER("SETL "+T1+","+constL, new Vector<>(), defs, new Vector<>());
         AsmInstr setL = new AsmOPER("SETL `d0,"+constL, new Vector<>(), defs, new Vector<>());
         visArg.add(setL);
@@ -179,6 +191,11 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
                 AsmInstr incML = new AsmOPER(op_code+" `s0,"+constInc, uses, defs, new Vector<>());
                 visArg.add(incML);
             }
+        }
+        if(constant.value < 0){ //we need to negate it as well (might have problems with value 0xffffffff, need to handle that as well)
+            // NEG: s($x) = Y - s($z) -> NEG $X,Y,$Z
+            AsmInstr incML = new AsmOPER("NEG `d0,0,`s0", uses, defs, new Vector<>());
+            visArg.add(incML);
         }
         
         
@@ -226,6 +243,8 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
                 uses.add(base); //s0
 
                 // AsmInstr load_relative = new AsmOPER("LDO "+T1+","+base+","+offset, uses, defs, new Vector<>());
+                // relative to what? rabmo se relativno glede na fp: TODO
+                // save offset to temp
                 AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,"+offset, uses, defs, new Vector<>());
                 visArg.add(load_relative);
             }
@@ -389,7 +408,7 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         Vector<MemTemp> defs = new Vector<>();
         Vector<MemTemp> uses = new Vector<>();
         defs.add(callRetVal);
-        jumps.add(this.codeChunk.entryLabel);
+        jumps.add(call.label);
 
         //kaj pa argumenti? TREBA JIH JE PASS-AT V CALL-FRAME (mogoce celo treba store-at v mem) (zaenkrat samo dodaj v uses)
         // call.args
@@ -405,8 +424,8 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         }
         //
 
-        // AsmInstr push_instr = new AsmOPER("PUSHJ $"+AsmGen.nReg+","+this.codeChunk.entryLabel.name, new Vector<>(), defs, jumps);
-        AsmInstr push_instr = new AsmOPER("PUSHJ $,"+this.codeChunk.entryLabel.name, uses, defs, jumps);
+        // AsmInstr push_instr = new AsmOPER("PUSHJ $"+AsmGen.nReg+","+call.label.name, new Vector<>(), defs, jumps);
+        AsmInstr push_instr = new AsmOPER("PUSHJ $,"+call.label.name, uses, defs, jumps);
         visArg.add(push_instr);
         return callRetVal;
 	}
