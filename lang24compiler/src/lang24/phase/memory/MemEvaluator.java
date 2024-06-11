@@ -22,8 +22,8 @@ import lang24.phase.seman.SemAn;
 public class MemEvaluator implements AstFullVisitor<Object, Object> {
     public static final long ptrSize = 8l;
     public static final long intSize = 8l;
-    public static final long boolSize = 1l;
-    public static final long charSize = 1l;
+    public static final long boolSize = 8l; //1l
+    public static final long charSize = 8l; //1l
 
     public static final long alignN = 8l;
 

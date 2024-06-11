@@ -269,16 +269,22 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
                 
                 // reuse T1: first use it to load constant and then to store actual value that is accessed from memory
                 visArg.addAll(AsmGenerator.loadConstantToTemp(T1, offset)); // offset is now in temp T1
-
-
                 defs.add(T1); //d0
-                uses.add(base); //s0
-                uses.add(T1); //s1
+                if(base == this.codeChunk.frame.FP){
+                    uses.add(T1); //s0
+                    // relative to fp, do use FP, not any other register
+                    AsmInstr load_relative = new AsmOPER("LDO `d0,FP,`s0 # fp-relative", uses, defs, new Vector<>());
+                    visArg.add(load_relative);
+                }
+                else{
+                    uses.add(base); //s0
+                    uses.add(T1); //s1
+    
+                    // AsmInstr load_relative = new AsmOPER("LDO "+T1+","+base+","+offset, uses, defs, new Vector<>());
+                    AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,`s1", uses, defs, new Vector<>());
+                    visArg.add(load_relative);
+                }
 
-                // AsmInstr load_relative = new AsmOPER("LDO "+T1+","+base+","+offset, uses, defs, new Vector<>());
-                // relative to what? rabmo se relativno glede na fp: TODO
-                AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,`s1", uses, defs, new Vector<>());
-                visArg.add(load_relative);
             }
             else{
                 MemTemp T2 = mem.addr.accept(this, visArg); //imamo drugi izraz
@@ -293,7 +299,7 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
             }
         }
         else if(mem.addr instanceof ImcNAME){ //LDA + LDO
-            MemTemp T2 = mem.addr.accept(this, visArg);
+            MemTemp T2 = mem.addr.accept(this, visArg); //to doda LDA
 
             defs.add(T1); //d0
             uses.add(T2); //s0
@@ -301,6 +307,29 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
             // AsmInstr load_abs = new AsmOPER("LDO "+T1+","+T2+",0", uses, defs, new Vector<>());
             AsmInstr load_abs = new AsmOPER("LDO `d0,`s0,0", uses, defs, new Vector<>());
             visArg.add(load_abs);
+        }
+        else if(mem.addr instanceof ImcTEMP){ //imamo temp
+            // System.out.println("[!] (imcmem) je temp (mogoce je fp? ce je fp, potem zamenjaj s fp)");
+            MemTemp T2 = mem.addr.accept(this, visArg); // pridobi temp
+            defs.add(T1);
+
+            AsmInstr load_abs;
+            if(T2 == this.codeChunk.frame.FP){
+                load_abs = new AsmOPER("LDO `d0,FP,0 # FP-relative", new Vector<>(), defs, new Vector<>()); // read from FP instead
+                visArg.add(load_abs);
+            }
+            else{
+                uses.add(T2);
+                load_abs = new AsmOPER("LDO `d0,`s0,0", uses, defs, new Vector<>());
+                visArg.add(load_abs);
+            }
+
+            
+        }
+        else if(mem.addr instanceof ImcMEM){ //nested mems
+            System.out.println("[!] (imcmem) je mem");
+            // TODO finish
+
         }
         else{
             System.out.println("[!] (imcmem) neki ni vredu");
@@ -318,13 +347,18 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         // if(binOp.sndExpr instanceof ImcCALL) System.out.println("binop: sndexpr: je call");;
         MemTemp T1 = binOp.fstExpr.accept(this, visArg);
         MemTemp T2 = binOp.sndExpr.accept(this, visArg);
-        
         defs.add(T1); // `d0
-        uses.add(T1); // `s0
-        uses.add(T2); // `s1
+        uses.add(T2); // `s0
         // System.out.printf("--> %s\n%s, %s (e1: %s, e2: %s)<--\n", binOp, T1, T2, binOp.fstExpr, binOp.sndExpr);
         // AsmInstr binop_asm = new AsmOPER(opCode+" "+T1+","+T1+","+T2, uses, defs, new Vector<>());
-        AsmInstr binop_asm = new AsmOPER(opCode+" `d0,`s0,`s1", uses, defs, new Vector<>());
+        AsmInstr binop_asm;
+        if(T1 == this.codeChunk.frame.FP){
+            binop_asm = new AsmOPER(opCode+" `d0,FP,`s0 # using FP", uses, defs, new Vector<>());
+        }
+        else{
+            uses.add(T1); // `s1
+            binop_asm = new AsmOPER(opCode+" `d0,`s1,`s0", uses, defs, new Vector<>());
+        }
         visArg.add(binop_asm);
         
         //get T1, T2, store to T1, return T1
@@ -433,21 +467,21 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         return null;
     }
 
-    // call:
+    // call: //TODO
 	public MemTemp visit(ImcCALL call, Vector<AsmInstr> visArg) {
         // System.out.println("klic funkcije");
         Vector<MemLabel> jumps = new Vector<>();
         Vector<MemTemp> defs = new Vector<>();
         Vector<MemTemp> uses = new Vector<>();
-        defs.add(callRetVal);
+        defs.add(callRetVal); //d0
         jumps.add(call.label);
 
-        //kaj pa argumenti? TREBA JIH JE PASS-AT V CALL-FRAME (mogoce celo treba store-at v mem) (zaenkrat samo dodaj v uses)
+        //kaj pa argumenti? TREBA JIH JE PASS-AT V CALL-FRAME (mogoce celo treba store-at v mem -> jp, TODO) (zaenkrat samo dodaj v uses)
         // call.args
         // call.offs
         for(ImcExpr e : call.args){ //maybe TODO: store to fp+offset
             if(e instanceof ImcTEMP){ //because we use only temps in function calls, if also allowed constants, we would need to accept args (see else)
-                uses.add(((ImcTEMP)e).temp);
+                uses.add(((ImcTEMP)e).temp); //si
             }
             // else{
             //     MemTemp Ti = e.accept(this, visArg);
@@ -457,15 +491,21 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         //
 
         // AsmInstr push_instr = new AsmOPER("PUSHJ $"+AsmGen.nReg+","+call.label.name, new Vector<>(), defs, jumps);
-        AsmInstr push_instr = new AsmOPER("PUSHJ $,"+call.label.name, uses, defs, jumps);
+        // AsmInstr push_instr = new AsmOPER("PUSHJ $,"+call.label.name, uses, defs, jumps);
+        AsmInstr push_instr = new AsmOPER("PUSHJ $,"+call.label.name, uses, new Vector<>(), jumps); //uses? a rabmo sploh?
+        AsmInstr load_retval = new AsmOPER("LDO `d0,SP,0 # load retval from stack", new Vector<>(), defs, new Vector<>());
+        
         visArg.add(push_instr);
+        visArg.add(load_retval);
         return callRetVal;
 	}
     
     // estmt: (we ignore it, because it is only used in void function calls (return value is discarded, we do not need it))
     public MemTemp visit(ImcESTMT eStmt, Vector<AsmInstr> visArg) {
-        //remove last instr we must, because the result we need do not - master Youghurt
-        visArg.removeLast();
+        //remove last two instr we must, because the result we need do not - master Yoghurt
+        visArg.removeLast(); // remove unnecessary ldo (used to load value from stack)
+        visArg.removeLast(); // remove unnecessary set (used to move return value to register)
+        // instructions gone, carry on - Obi-canned-ravioli
         return null;
     }
 }

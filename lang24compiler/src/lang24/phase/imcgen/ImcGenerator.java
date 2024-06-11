@@ -45,12 +45,47 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
                     // System.out.println(defnStack.get((int)depth));
                     AstFunDefn funDefn = defnStack.get((int)depth);
                     if(funDefn != null){
+                        //tole ne bo vredu, treba bo drugac (glede na lokalni fp, ne pa fp od druge funkcije, naredi ustrezno stevilo mem-ov:) TODO
                         MemFrame mf = Memory.frames.get(funDefn);
                         if(mf != null){
-                            MemTemp fp = mf.FP;
+                            // prejsnji nacin
+                            // MemTemp fp = mf.FP; // fp funkcije, kjer je spremenljivka definirana
+                            // ImcExpr expr_temp = new ImcTEMP(fp);
+                            // ImcExpr expr_add = new ImcBINOP(ImcBINOP.Oper.ADD, expr_temp, c);
+                            // return expr_add;
+
+                            //novi nacin:
+                            // test:
+                            // trenutna globina:
+                            // AstFunDefn currentFunc = this.defnStack.getLast();
+                            // MemFrame mf_current = Memory.frames.get(currentFunc);
+                            // long current_depth = mf_current.depth;
+                            // long current_depth_index = this.defnStack.size()-1;
+                            // String name_of_expression = ((AstNameExpr) expr).name;
+                            // System.out.printf("name (relative): %s, (current f: %s); trenutna globina: %s (%s), globina izraza: %s, razlika: %s\n",
+                            //     name_of_expression,
+                            //     currentFunc.name,
+                            //     current_depth,
+                            //     current_depth_index,
+                            //     depth,
+                            //     current_depth-depth
+                            // );
+
+                            // dodaj mem, ce je razlika v globinah, da bo relativno glede na trenutni frame pointer
+                            AstFunDefn currentFunc = this.defnStack.getLast();
+                            MemFrame mf_current = Memory.frames.get(currentFunc);
+                            long current_depth = mf_current.depth;
+                            long depthDifference = current_depth-depth; //get the difference between depth of function, where this name expression is defined and current function
+                            MemTemp fp = mf_current.FP; // fp trenutne funkcije
+
+                            // dodaj ustrezno stevilo mem-ov:
                             ImcExpr expr_temp = new ImcTEMP(fp);
+                            for(long i = 0; i < depthDifference; i++){
+                                expr_temp = new ImcMEM(expr_temp);
+                            }
                             ImcExpr expr_add = new ImcBINOP(ImcBINOP.Oper.ADD, expr_temp, c);
                             return expr_add;
+                            
                         }
                     }
                     return c;
@@ -296,7 +331,7 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
 		arrExpr.idx.accept(this, arg);
         
         
-        
+
         ImcExpr e = this.getAddr(arrExpr); //pridobi address expression-a
         // ImcExpr e = this.getAddr(arrExpr.arr); //pridobi address expression-a
         // System.out.printf("arrexpr: fst: %s, snd: %s, imcexpr: %s\n", arrExpr.arr, arrExpr.idx, e);
