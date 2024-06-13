@@ -452,6 +452,11 @@ public class ImcGenerator implements AstFullVisitor<Object, Object> {
     private ImcExpr getSL(AstFunDefn current, AstFunDefn calling){
         MemFrame mf1 = Memory.frames.get(current);
         MemFrame mf2 = Memory.frames.get(calling);
+
+        //function is global, sl is not needed:
+        if(mf2.depth == 0){
+            return new ImcCONST(0);
+        }
         
         long nMem = (mf1.depth - mf2.depth) +1; //depth difference +1 (if we call inner function, then SL is equal to FP of the caller function)
         ImcExpr SL = new ImcTEMP(mf1.FP);

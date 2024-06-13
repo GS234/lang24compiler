@@ -162,7 +162,9 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         if(cjump.cond instanceof ImcBINOP){
             //get op
             String branchAfterCompare = ""; //must be opposite, as we only jump on false
-            switch (((ImcBINOP)cjump.cond).oper) {
+            String cmpOper = "CMP";
+            ImcBINOP.Oper oper = ((ImcBINOP)cjump.cond).oper;
+            switch (oper) {
                 // case  ImcBINOP.Oper.OR: case ImcBINOP.Oper.AND: op="BZ"; compare=false; break; //ce je 1, potem ne skoci, drugace skoci (zero = else)
                 case EQU: branchAfterCompare="BNZ"; break;
                 case NEQ: branchAfterCompare="BZ"; break;
@@ -171,8 +173,12 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
                 case LEQ: branchAfterCompare="BP"; break;
                 case GEQ: branchAfterCompare="BN"; break;
             
-                default:
-                    break; //break compiler :(
+                default: {
+                    branchAfterCompare="BZ"; // eval and compare
+                    cmpOper = oper.name();
+                    System.out.println("cjump: "+cmpOper);
+                    break;
+                }
             }
             
             // get temps:
@@ -183,7 +189,7 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
             uses.add(T1); //s0
             uses.add(T2); //s1
             // AsmInstr ai_compare = new AsmOPER("CMP "+T1+","+T1+","+T2, uses, defs, new Vector<>()); //compare it
-            AsmInstr ai_compare = new AsmOPER("CMP `d0,`s0,`s1", uses, defs, new Vector<>());
+            AsmInstr ai_compare = new AsmOPER(cmpOper+" `d0,`s0,`s1", uses, defs, new Vector<>());
             
 
             uses = new Vector<>(); //new instruction, new set
@@ -202,8 +208,8 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
            
             if(imcConst == 0){ //do not jump, delete code instead (skipToLabel: skip if)
                 // System.out.println("je konstanta, 0");
-                AsmInstr ai = new AsmOPER("JMP "+negLabel.name, new Vector<>(), new Vector<>(), jumps);
-                visArg.add(ai);
+                // AsmInstr ai = new AsmOPER("JMP "+negLabel.name, new Vector<>(), new Vector<>(), jumps);
+                // visArg.add(ai);
                 this.skipToLabel = cjump.negLabel;
             }
             else{ //skipFromToLabel: delete (skip) else
@@ -242,20 +248,20 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
 
     //helper method to get opCode from binop operator
     private String opCodeFromBINOP(ImcBINOP.Oper oper){
-        String op;
-        switch (oper) {
-            case OR: op="OR"; break;
-            case AND: op="AND"; break;
+        // String op;
+        // switch (oper) {
+        //     case OR: op="OR"; break;
+        //     case AND: op="AND"; break;
             
-            case ADD: op="ADD"; break;
-            case SUB: op="SUB"; break;
-            case MUL: op="MUL"; break;
-            case DIV: op="DIV"; break;
-            case MOD: op="MOD"; break;
+        //     case ADD: op="ADD"; break;
+        //     case SUB: op="SUB"; break;
+        //     case MUL: op="MUL"; break;
+        //     case DIV: op="DIV"; break;
+        //     case MOD: op="MOD"; break;
 
-            default: op = ""; break; //break compiler :(
-        }
-        return op;
+        //     default: op = ""; break; //break compiler :(
+        // }
+        return oper.name();
     }
 
     //memory access: absolute, relative (relative: has binop) 
@@ -347,12 +353,24 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
 	}
 
     //binop, unop:
+    // function checks if operation is logical or arithmetic
+    private boolean isOpLogical(ImcBINOP.Oper op){
+        boolean result = true;
+        switch(op){
+            case AND: case OR: case ADD: case SUB: case MUL: case DIV: case MOD: result = false;
+            default: break;
+        }
+        return result;
+    }
+
     public MemTemp visit(ImcBINOP binOp, Vector<AsmInstr> visArg) { //ce pridemo do sem, izvedi operacijo: visit expr1, expr2, op, return
         Vector<MemTemp> uses = new Vector<>();
         Vector<MemTemp> defs = new Vector<>();
         
         String opCode = opCodeFromBINOP(binOp.oper);
+        // System.out.printf("%s, %s\n",opCode, this.isOpLogical(binOp.oper));
         // if(binOp.sndExpr instanceof ImcCALL) System.out.println("binop: sndexpr: je call");;
+        // System.out.printf("%s, %s\n",binOp.fstExpr,binOp.sndExpr);
         MemTemp T1 = binOp.fstExpr.accept(this, visArg);
         MemTemp T2 = binOp.sndExpr.accept(this, visArg);
         defs.add(T1); // `d0
@@ -384,9 +402,64 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
                 binop_asm = binop_sub; //is added later
 
             }
-            else{    
+            else if(this.isOpLogical(binOp.oper)){ //it is logical, we need to compare it
+                uses.add(T1); //s1
+                AsmInstr cmp1 = new AsmOPER("CMP `d0,`s1,`s0 # ...", new Vector<>(uses), new Vector<>(defs), null);
+                visArg.add(cmp1);
+                //EQU, NEQ, LTH, GTH, LEQ, GEQ, ADD, SUB, MUL, DIV, MOD,
+                Vector<MemTemp> log_uses = new Vector<>();
+                log_uses.add(T1); //s0
+                switch (binOp.oper) {
+                    case EQU: {
+                        AsmInstr and = new AsmOPER("AND `d0,`s0,1 # ...", log_uses, defs, null);
+                        AsmInstr xor = new AsmOPER("XOR `d0,`s0,1 # EQU", log_uses, defs, null);
+                        visArg.add(and);
+                        binop_asm = xor;
+                        break;
+                    }
+                    case NEQ: {
+                        AsmInstr and = new AsmOPER("AND `d0,`s0,1 # NEQ", log_uses, defs, null);
+                        binop_asm = and;
+                        break;
+                    }
+                    case LTH: {
+                        AsmInstr neg = new AsmOPER("NEG `d0,0,`s0 # ...", log_uses, defs, null);
+                        AsmInstr cmp2 = new AsmOPER("CMP `d0,`s0,0 # NEQ", log_uses, defs, null);
+                        visArg.add(neg);
+                        binop_asm = cmp2;
+                        break;
+                    }
+                    case GTH: {
+                        AsmInstr cmp2 = new AsmOPER("CMP `d0,`s0,0 # GTH", log_uses, defs, null);
+                        binop_asm = cmp2;
+                        break;
+                    }
+                    case LEQ: {
+                        AsmInstr sub = new AsmOPER("SUB `d0,`s0,1 # ...", log_uses, defs, null);
+                        AsmInstr neg = new AsmOPER("NEG `d0,0,`s0 # ...", log_uses, defs, null);
+                        AsmInstr cmp2 = new AsmOPER("CMP `d0,`s0,0 # LEQ", log_uses, defs, null);
+                        visArg.add(sub);
+                        visArg.add(neg);
+                        binop_asm = cmp2;
+                        break;
+                    }
+                    case GEQ: {
+                        AsmInstr add = new AsmOPER("ADD `d0,`s0,1 # ...", log_uses, defs, null);
+                        AsmInstr cmp2 = new AsmOPER("CMP `d0,`s0,0 # GEQ", log_uses, defs, null);
+                        visArg.add(add);
+                        binop_asm = cmp2;
+                        break;
+                    }
+                    default: {
+                        System.out.println(binOp.oper.name());
+                        binop_asm = cmp1;
+                        break;
+                    } //to je mal broken, do tega primera ne bi smelo priti
+                }
+            }
+            else{
                 uses.add(T1); // `s1
-                binop_asm = new AsmOPER(opCode+" `d0,`s1,`s0", uses, defs, new Vector<>());
+                binop_asm = new AsmOPER(opCode+" `d0,`s1,`s0 # binop else", uses, defs, new Vector<>());
             }
 
         }
