@@ -29,6 +29,8 @@ import lang24.data.lin.LinCodeChunk;
 import lang24.data.mem.MemLabel;
 import lang24.data.mem.MemTemp;
 import lang24.phase.imcgen.ImcGen;
+import lang24.phase.memory.MemEvaluator;
+import lang24.phase.memory.Memory;
 import lang24.phase.regall.RegAll;
 
 public class AsmGenerator {
@@ -263,8 +265,8 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         MemTemp T1 = new MemTemp(); //can we avoid this new label? maybe fix frame pointer (SL access) (fix imcgen)
         if(mem.addr instanceof ImcBINOP){ //we have relative access, load from memory:
             // String opCode = opCodeFromBINOP(((ImcBINOP)mem.addr).oper);
-            MemTemp base = ((ImcBINOP)mem.addr).fstExpr.accept(this, visArg);
             if(((ImcBINOP)mem.addr).sndExpr instanceof ImcCONST){ //imamo relative access, drugace imamo pa array, treba je visitat sndExpr
+                MemTemp base = ((ImcBINOP)mem.addr).fstExpr.accept(this, visArg);
                 Long offset = ((ImcCONST) ((ImcBINOP)mem.addr).sndExpr).value;
                 
                 // reuse T1: first use it to load constant and then to store actual value that is accessed from memory
@@ -289,12 +291,13 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
             else{
                 MemTemp T2 = mem.addr.accept(this, visArg); //imamo drugi izraz
                 
+                
                 defs.add(T1); //d0
-                uses.add(base); //s0
-                uses.add(T2); //s1
+                uses.add(T2); //s0
+                // uses.add(base); //s1
 
                 // AsmInstr load_relative = new AsmOPER("LDO "+T1+","+base+","+T2, uses, defs, new Vector<>());
-                AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,`s1", uses, defs, new Vector<>());
+                AsmInstr load_relative = new AsmOPER("LDO `d0,`s0,0 #array", uses, defs, new Vector<>());
                 visArg.add(load_relative);
             }
         }
@@ -326,9 +329,14 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
 
             
         }
-        else if(mem.addr instanceof ImcMEM){ //nested mems
-            System.out.println("[!] (imcmem) je mem");
-            // TODO finish
+        else if(mem.addr instanceof ImcMEM){ //nested mems? mogoce treba popravt
+            MemTemp T2 = mem.addr.accept(this, visArg); //imamo drugi izraz
+            defs.add(T2); //d0
+            uses.add(T2); //s0
+
+            // AsmInstr load_relative = new AsmOPER("LDO "+T1+","+base+","+T2, uses, defs, new Vector<>());
+            AsmInstr load_mem = new AsmOPER("LDO `d0,`s0,0 # mem[mem]", uses, defs, new Vector<>());
+            visArg.add(load_mem);
 
         }
         else{
@@ -356,8 +364,31 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
             binop_asm = new AsmOPER(opCode+" `d0,FP,`s0 # using FP", uses, defs, new Vector<>());
         }
         else{
-            uses.add(T1); // `s1
-            binop_asm = new AsmOPER(opCode+" `d0,`s1,`s0", uses, defs, new Vector<>());
+            
+            //je mod, treba odsimulirat:
+            if(opCode.equals("MOD")){
+                MemTemp c = new MemTemp(); //temporary var to store intermediate results
+                Vector<MemTemp> mod_uses = new Vector<>();
+                Vector<MemTemp> mod_defs = new Vector<>();
+                mod_defs.add(c); //d0 -> c
+                mod_uses.add(T1); //s0 -> a
+                mod_uses.add(T2); //s1 -> b
+                AsmInstr binop_div = new AsmOPER("DIV `d0,`s0,`s1 # mod div", mod_uses, mod_defs, null);
+                mod_uses.add(c); //s2 -> c
+                AsmInstr binop_mul = new AsmOPER("MUL `d0,`s2,`s1 # mod mul", mod_uses, mod_defs, null);
+                mod_defs.add(T1); //d1 -> a
+                AsmInstr binop_sub = new AsmOPER("SUB `d1,`s0,`s2 # mod sub", mod_uses, mod_defs, null);
+                
+                visArg.add(binop_div);
+                visArg.add(binop_mul);
+                binop_asm = binop_sub; //is added later
+
+            }
+            else{    
+                uses.add(T1); // `s1
+                binop_asm = new AsmOPER(opCode+" `d0,`s1,`s0", uses, defs, new Vector<>());
+            }
+
         }
         visArg.add(binop_asm);
         
@@ -401,12 +432,12 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         
         AsmInstr move_asm;
         if(move.dst instanceof ImcMEM){ //store (T1 has address)
-            MemTemp T1 = ((ImcMEM)move.dst).addr.accept(this, visArg); //rabim samo address, ne dejanskega dostopa do vrednosti
-            MemTemp T2 = move.src.accept(this, visArg); //source
+            MemTemp T1 = ((ImcMEM)move.dst).addr.accept(this, visArg); //rabim samo address, ne dejanskega dostopa do vrednosti (address)
+            MemTemp T2 = move.src.accept(this, visArg); //source (value)
             
             // defs.add(T1); // d0 //nic ne definira!
-            uses.add(T1); // s0 //address
-            uses.add(T2); // s1
+            uses.add(T2); // s0 //value
+            uses.add(T1); // s1 //address
 
 
             // move_asm = new AsmOPER("STO "+T1+","+T2+",0 # move to mem", uses, defs, new Vector<>());
@@ -467,32 +498,41 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
         return null;
     }
 
-    // call: //TODO
+    // call: //load arguments on stack: static link + args ([!] pazi na ImcESTMT)
 	public MemTemp visit(ImcCALL call, Vector<AsmInstr> visArg) {
         // System.out.println("klic funkcije");
         Vector<MemLabel> jumps = new Vector<>();
         Vector<MemTemp> defs = new Vector<>();
-        Vector<MemTemp> uses = new Vector<>();
         defs.add(callRetVal); //d0
         jumps.add(call.label);
 
-        //kaj pa argumenti? TREBA JIH JE PASS-AT V CALL-FRAME (mogoce celo treba store-at v mem -> jp, TODO) (zaenkrat samo dodaj v uses)
+        //kaj pa argumenti? TREBA JIH JE PASS-AT V CALL-FRAME (=> mogoce celo treba store-at v mem -> jp)
         // call.args
         // call.offs
-        for(ImcExpr e : call.args){ //maybe TODO: store to fp+offset
+        // System.out.printf("function: %s, parameters:\n",call.label.name);
+        long sp_offset = 0; //offset
+        for(ImcExpr e : call.args){
+            //za vsak parameter: nalozi ga na sklad
+            
+            Vector<MemTemp> arg_uses = new Vector<>();
+            MemTemp Ti;
             if(e instanceof ImcTEMP){ //because we use only temps in function calls, if also allowed constants, we would need to accept args (see else)
-                uses.add(((ImcTEMP)e).temp); //si
+                Ti = ((ImcTEMP)e).temp;
             }
-            // else{
-            //     MemTemp Ti = e.accept(this, visArg);
-            //     uses.add(Ti);
-            // }
+            else{
+                Ti = e.accept(this, visArg);
+            }
+            arg_uses.add(Ti); //s0
+            AsmInstr add_arg = new AsmOPER("STO `s0,SP,"+sp_offset+" # arg"+(sp_offset%MemEvaluator.ptrSize), arg_uses, new Vector<>(), new Vector<>()); // TODO: pretvori konstanto v instr (registerski offset, stevilo argumentov trenutno omejeno na 256)
+            sp_offset = sp_offset + MemEvaluator.ptrSize;
+            visArg.add(add_arg);
         }
+        // System.out.println("<---");
         //
 
         // AsmInstr push_instr = new AsmOPER("PUSHJ $"+AsmGen.nReg+","+call.label.name, new Vector<>(), defs, jumps);
         // AsmInstr push_instr = new AsmOPER("PUSHJ $,"+call.label.name, uses, defs, jumps);
-        AsmInstr push_instr = new AsmOPER("PUSHJ $,"+call.label.name, uses, new Vector<>(), jumps); //uses? a rabmo sploh?
+        AsmInstr push_instr = new AsmOPER("PUSHJ $,"+call.label.name, new Vector<>(), new Vector<>(), jumps); //uses? a rabmo sploh? NE, ker jih ze prej porabimo (za load na sklad)
         AsmInstr load_retval = new AsmOPER("LDO `d0,SP,0 # load retval from stack", new Vector<>(), defs, new Vector<>());
         
         visArg.add(push_instr);

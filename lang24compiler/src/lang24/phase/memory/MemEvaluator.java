@@ -52,7 +52,7 @@ public class MemEvaluator implements AstFullVisitor<Object, Object> {
 		// Long paramOffset = 0l;
         Long defnOffset = 0l;
         Long frameSize = 0l; //local defns + [function call frames + params] +  old fp + ret val
-        Long SLSize = 8l;
+        Long SLSize = 8l; // static link
         long argSize = 0l; //velikost argumentov (maksimalna velikost argumentov klicanih funkcij)
         Long rTypeSize = 0l; //velikost return tipa
 
@@ -125,7 +125,7 @@ public class MemEvaluator implements AstFullVisitor<Object, Object> {
             ml,
             MemEvaluator.depth,
             defnOffset,
-            argSize,
+            blockSize,
             frameSize
         );
         Memory.frames.put(funDefn, mf);
