@@ -3,15 +3,12 @@ package lang24.phase.outgen;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.LinkedList;
 import java.util.Vector;
 
 import lang24.data.asm.AsmInstr;
 import lang24.data.asm.AsmLABEL;
 import lang24.data.asm.Code;
 import lang24.data.lin.LinDataChunk;
-import lang24.data.mem.MemFrame;
-import lang24.data.mem.MemTemp;
 import lang24.phase.Phase;
 import lang24.phase.asmgen.AsmGen;
 import lang24.phase.asmgen.AsmGenerator;
@@ -45,10 +42,17 @@ public class OutGen extends Phase{
 			// go over each code segment, print it to file (add prologue, epilogue)
 			for(Code c : AsmGen.codes){
 				out.print(this.addPrologue(c)); // add prologue
+				AsmInstr prev_instr = null;
 				for(AsmInstr instr : c.instrs){
 					// print codes
-					if(instr instanceof AsmLABEL) out.print(instr.toString(RegAll.tempToReg));
+					if(instr instanceof AsmLABEL) {
+						if(prev_instr instanceof AsmLABEL){ //ze prejsnji je bil label, dodaj NOP (oz. ADD $0,$0,0 (efektivno nop))
+							out.println("\tADD $0,$0,0 # NOP");
+						}
+						out.print(instr.toString(RegAll.tempToReg));
+					}
 					else out.println("\t"+instr.toString(RegAll.tempToReg));
+					prev_instr = instr;
 				}
 				out.print(this.addEpilogue(c)); // add epilogue
 			}
@@ -106,7 +110,6 @@ public class OutGen extends Phase{
 		return sb.toString();
 	}
 
-	// TODO
 	private String addGlobalData(){
 		Vector<LinDataChunk> dataChunks = ImcLin.dataChunks(); //get data chunks
 		StringBuilder sb = new StringBuilder();
@@ -154,7 +157,6 @@ public class OutGen extends Phase{
 			}
 		}
 		return sb.toString();
-		// return "### global data: TODO ###\n";
 	}
 
 

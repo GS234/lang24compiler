@@ -522,8 +522,16 @@ class TileResolver implements ImcVisitor<MemTemp, Vector<AsmInstr>>{
             else{
                 Ti = e.accept(this, visArg);
             }
-            arg_uses.add(Ti); //s0
-            AsmInstr add_arg = new AsmOPER("STO `s0,SP,"+sp_offset+" # arg"+(sp_offset%MemEvaluator.ptrSize), arg_uses, new Vector<>(), new Vector<>()); // TODO: pretvori konstanto v instr (registerski offset, stevilo argumentov trenutno omejeno na 256)
+
+            AsmInstr add_arg;
+            if(Ti == this.codeChunk.frame.FP){
+                add_arg = new AsmOPER("STO FP,SP,"+sp_offset+" # FP arg"+(sp_offset/MemEvaluator.ptrSize), new Vector<>(), new Vector<>(), new Vector<>());    
+            }
+            else{
+                arg_uses.add(Ti); //s0
+                add_arg = new AsmOPER("STO `s0,SP,"+sp_offset+" # arg"+(sp_offset/MemEvaluator.ptrSize), arg_uses, new Vector<>(), new Vector<>()); // TODO: pretvori konstanto v instr (registerski offset, stevilo argumentov trenutno omejeno na 256)
+            }
+
             sp_offset = sp_offset + MemEvaluator.ptrSize;
             visArg.add(add_arg);
         }
