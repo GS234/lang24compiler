@@ -1,0 +1,144 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+}
+
+plugins {
+    id 'java'
+    id 'application'
+    id 'antlr'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+}
+
+version = project.project_version
+group = ""
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    antlr("org.antlr:antlr4:$project.antlr_version")
+    implementation("org.antlr:antlr4-runtime:$project.antlr_version")
+}
+
+def mainClass = "${project.src_root_name}.Compiler"
+def phaseDir = "src/${project.src_root_name}/phase"
+def lexanDir = "$phaseDir/lexan"
+def synanDir = "$phaseDir/synan"
+def lexerName = project.lexer_file_name
+def parserName = project.parser_file_name
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+        antlr {
+            srcDirs = [lexanDir]
+        }
+    }
+}
+
+generateGrammarSource {
+    source {
+        include("${lexerName}.g4")
+        outputDirectory = file(lexanDir)
+    }
+    source {
+        include("${parserName}.g4")
+        outputDirectory = file(synanDir)
+    }
+
+    // For some reason, the generated lexer is placed in the synan directory
+    doLast {
+        // Move generated lexer to the phase directory
+        copy {
+            from fileTree(synanDir)
+            into file(lexanDir)
+            include "${lexerName}.java"
+            include "${lexerName}.interp"
+            include "${lexerName}.tokens"
+            include "${lexerName}.java-orig"
+        }
+        // Delete generated lexer from the synan directory
+        delete fileTree(synanDir) {
+            include "${lexerName}.java"
+            include "${lexerName}.interp"
+            include "${lexerName}.tokens"
+            include "${lexerName}.java-orig"
+        }
+    }
+}
+
+application {
+    mainClassName = mainClass
+}
+
+jar {
+    // Fat jar (include all dependencies)
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    // Specify the main class when launching the jar
+    manifest {
+        attributes(
+                'Main-Class': mainClass
+        )
+    }
+}
+
+clean {
+    delete file("$lexanDir/${lexerName}.java")
+    delete file("$lexanDir/${lexerName}.java-orig")
+    delete file("$lexanDir/${lexerName}.interp")
+    delete file("$lexanDir/${lexerName}.tokens")
+
+    delete file("$synanDir/${parserName}.java")
+    delete file("$synanDir/${parserName}.java-orig")
+    delete file("$synanDir/${parserName}.interp")
+    delete file("$synanDir/${parserName}.tokens")
+
+    // Remove generated program xml and html files
+    delete fileTree("prg", {
+        it.include("*.xml", "*.html")
+    })
+}
+
+run {
+    enableAssertions = true
+    def isDebug = System.getenv("IDEA_RUNNER") == "debugger"
+    // Set `INTP_DEBUG=true` environment variable to true to enable debug mode
+    System.setProperty("INTP_DEBUG", isDebug.toString())
+
+    // Default args
+    var xsl = getPropertyOrDefault("xsl", "lib/xsl")
+    var loggedPhase = getPropertyOrDefault("loggedPhase", "all")
+    var targetPhase = getPropertyOrDefault("targetPhase", "all")
+    var srcFileName = getPropertyOrDefault("srcFileName", null)
+    var dstFileName = getPropertyOrDefault("dstFileName", null)
+
+    List<Object> argList = ["--xsl=$xsl", "--logged-phase=$loggedPhase", "--target-phase=$targetPhase", "--num-regs=4"]
+
+
+    if (srcFileName != null) {
+        argList.add("--src-file-name=prg/${srcFileName}.lang24")
+    }
+
+    if (dstFileName != null) {
+        argList.add("--dst-file-name=out/${dstFileName}.mms")
+    } else if (srcFileName != null) {
+        argList.add("--dst-file-name=out/${srcFileName}.mms")
+    }
+
+    args = argList
+}
+
+def getPropertyOrDefault(String propertyName, String defaultValue) {
+    return project.hasProperty(propertyName) ? project.properties[propertyName] : defaultValue
+}

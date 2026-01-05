@@ -8,7 +8,20 @@ FIND		= 'find'
 all	:
 	if [ -d src/lang24/phase/lexan ] ; then $(MAKE) -C src/lang24/phase/lexan ; fi
 	if [ -d src/lang24/phase/synan ] ; then $(MAKE) -C src/lang24/phase/synan ; fi
+
+	# Gradle modification start
+	# Copy module-inof.java to module-info.java-orig
+	mv src/module-info.java src/module-info.java-orig
+	# Change require statement
+	sed 's/requires org\.antlr\.antlr4\.runtime;/requires antlr;/' < src/module-info.java-orig > src/module-info.java
+
+	# Original compilation command
 	$(JAVAC) --module-path $(ANTLRDIR) --source-path src -d bin src/lang24/Compiler.java
+
+	# Move file back to original name
+	mv src/module-info.java-orig src/module-info.java
+	# Gradle modification end
+
 	@echo ":-) OK"
 
 .PHONY	: clean
